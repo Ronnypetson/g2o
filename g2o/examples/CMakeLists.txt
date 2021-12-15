@@ -4,6 +4,7 @@ add_subdirectory(dynamic_vertex)
 add_subdirectory(bal)
 add_subdirectory(target)
 add_subdirectory(tutorial_slam2d)
+add_subdirectory(tutorial_epipolar_slam)
 
 # 2D SLAM examples
 
