@@ -64,43 +64,45 @@ namespace g2o {
         Eigen::Vector3d& rotation() {return _R;}
 
         SE3 operator * (const SE3& tr3) const{
-          /*
-          TODO: implement using Sophus
-          */
           SE3 result(*this);
-          // Eigen::MatrixXd delta = Eigen::MatrixXd::Zero(6, 1);
-          Eigen::MatrixXd exp_left = Sophus::SE3<double>::exp(result.toVector()).matrix();
-          Eigen::MatrixXd exp_right = Sophus::SE3<double>::exp(tr3.toVector()).matrix();
-          Eigen::MatrixXd exp_result = exp_left * exp_right;
+          Eigen::Matrix4d exp_left = Sophus::SE3<double>::exp(result.toVector()).matrix();
+          Eigen::Matrix4d exp_right = Sophus::SE3<double>::exp(tr3.toVector()).matrix();
+          Eigen::Matrix4d exp_result = exp_left * exp_right;
           Sophus::SE3<double> _result(exp_result);
           Vector6 vec_result = _result.log();
-          result._t << vec_result(0), vec_result(1), vec_result(2);
-          result._R << vec_result(3), vec_result(4), vec_result(5);
-          // result._t += _R * tr3._t;
-          // result._R.angle() += tr3._R.angle();
-          // result._R.angle() = normalize_theta(result._R.angle());
+          result._t << vec_result.block<3, 1>(0, 0);
+          result._R << vec_result.block<3, 1>(3, 0);
           return result;
         }
 
         SE3& operator *= (const SE3& tr3){
-          // _t += _R * tr3._t;
-          // _R.angle() += tr3._R.angle();
-          // _R.angle() = normalize_theta(_R.angle());
+          SE3 tmp(*this);
+          Eigen::Matrix4d exp_result = Sophus::SE3<double>::exp((tmp * tr3).toVector()).matrix();
+          Sophus::SE3<double> _result(exp_result);
+          Vector6 vec_result = _result.log();
+          _t = vec_result.block<3, 1>(0, 0);
+          _R = vec_result.block<3, 1>(3, 0);
           return *this;
         }
 
         Eigen::Vector3d operator * (const Eigen::Vector3d& v) const {
-          // return _t + _R * v;
-          return v;
+          Eigen::Vector4d v_hom;
+          v_hom << v(0), v(1), v(2), 1.0;
+          SE3 tmp(*this);
+          Eigen::Matrix4d exp_T = Sophus::SE3<double>::exp(tmp.toVector()).matrix();
+          return (exp_T * v_hom).block<3, 1>(0, 3);
         }
 
         SE3 inverse() const{
-          // SE3 ret;
-          // ret._R = _R.inverse();
-          // ret._R.angle() = normalize_theta(ret._R.angle());
-          // ret._t = ret._R * (Eigen::Vector3d(-1 * _t));
-          // return ret;
-          return *this;
+          SE3 ret;
+          SE3 tmp(*this);
+          Eigen::Matrix4d exp_T = Sophus::SE3<double>::exp(tmp.toVector()).matrix();
+          exp_T = exp_T.inverse();
+          Sophus::SE3<double> _result(exp_T);
+          Vector6 vec_result = _result.log();
+          ret._t = vec_result.block<3, 1>(0, 0);
+          ret._R = vec_result.block<3, 1>(3, 0);
+          return ret;
         }
 
         double operator [](int i) const {
@@ -117,16 +119,10 @@ namespace g2o {
           return _R(i - 3);
         }
 
-        /*
-        TODO: change to 6d vector
-        */
         void fromVector (const Vector6& v){
           *this = SE3(v[0], v[1], v[2], v[3], v[4], v[5]);
         }
 
-        /*
-        TODO: change to 6d vector
-        */
         Vector6 toVector() const {
           Vector6 ret;
           for (int i = 0; i < 6; i++){
