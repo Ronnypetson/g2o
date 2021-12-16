@@ -131,6 +131,12 @@ namespace g2o {
           return ret;
         }
 
+        Eigen::Matrix4d toMatrix() const {
+          SE3 tmp(*this);
+          Eigen::Matrix4d exp_T = Sophus::SE3<double>::exp(tmp.toVector()).matrix();
+          return exp_T;
+        }
+
       protected:
         Eigen::Vector3d _R;
         Eigen::Vector3d _t;
