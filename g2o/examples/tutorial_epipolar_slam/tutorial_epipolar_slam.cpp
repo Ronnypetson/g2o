@@ -1,6 +1,7 @@
 #include <iostream>
 #include "se3.h"
-#include "vertex_se3.h"
+#include "vertex_epipolar_se3.h"
+#include "edge_epipolar_se3.h"
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -24,11 +25,17 @@ void test_se3(){
 }
 
 void test_vertex_se3(){
-    VertexSE3 vse3;
-    std::cout << "Testing VertexSE3" << std::endl << std::endl;
+    VertexEpipolarSE3 vse3;
+    std::cout << "Testing VertexEpipolarSE3" << std::endl << std::endl;
+}
+
+void test_edge_se3(){
+    EdgeEpipolarSE3 edge_se3;
+    std::cout << "Testing EdgeEpipolarSE3" << std::endl << std::endl;
 }
 
 int main(){
-    // test_se3();
+    test_se3();
     test_vertex_se3();
+    test_edge_se3();
 }
