@@ -75,24 +75,24 @@ namespace g2o {
         /**
          * \brief point association constraint
          */
-        struct G2O_TUTORIAL_EPIPOLAR_SLAM_API GridEdge
-        {
-          int from;
-          int to;
-          SE3 trueTransf;
-          SE3 simulatorTransf;
-          Eigen::Matrix<double, 6, 6> information;
-          EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-        };
-        typedef std::vector<GridEdge, Eigen::aligned_allocator<GridEdge> >  GridEdgeVector;
+        // struct G2O_TUTORIAL_EPIPOLAR_SLAM_API GridEdge
+        // {
+        //   int from;
+        //   int to;
+        //   SE3 trueTransf;
+        //   SE3 simulatorTransf;
+        //   Eigen::Matrix<double, 6, 6> information;
+        //   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+        // };
+        // typedef std::vector<GridEdge, Eigen::aligned_allocator<GridEdge> >  GridEdgeVector;
 
         struct G2O_TUTORIAL_EPIPOLAR_SLAM_API LandmarkEdge
         {
           int from;
           int to;
-          Eigen::Vector3d trueMeas;
-          Eigen::Vector3d simulatorMeas;
-          Eigen::Matrix3d information;
+          Eigen::Vector4d trueMeas;
+          Eigen::Vector4d simulatorMeas;
+          Eigen::Matrix2d information;
           EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         };
         typedef std::vector<LandmarkEdge, Eigen::aligned_allocator<LandmarkEdge> >  LandmarkEdgeVector;
@@ -105,13 +105,13 @@ namespace g2o {
 
         const PosesVector& poses() const { return _poses;}
         const LandmarkVector& landmarks() const { return _landmarks;}
-        const GridEdgeVector& odometry() const { return _odometry;}
+        // const GridEdgeVector& odometry() const { return _odometry;}
         const LandmarkEdgeVector& landmarkObservations() const { return _landmarkObservations;}
 
       protected:
         PosesVector _poses;
         LandmarkVector _landmarks;
-        GridEdgeVector _odometry;
+        // GridEdgeVector _odometry;
         LandmarkEdgeVector _landmarkObservations;
 
         GridPose generateNewPose(const GridPose& prev, const SE3& trueMotion, const Eigen::Vector3d& transNoise, const Eigen::Vector3d& rotNoise);

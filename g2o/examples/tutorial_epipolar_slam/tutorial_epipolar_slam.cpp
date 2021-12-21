@@ -1,41 +1,154 @@
+// g2o - General Graph Optimization
+// Copyright (C) 2011 R. Kuemmerle, G. Grisetti, W. Burgard
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+// * Redistributions of source code must retain the above copyright notice,
+//   this list of conditions and the following disclaimer.
+// * Redistributions in binary form must reproduce the above copyright
+//   notice, this list of conditions and the following disclaimer in the
+//   documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+// IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+// PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+// TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+// LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+// NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include <iostream>
-#include "se3.h"
+#include <cmath>
+
+#include "simulator.h"
+
 #include "vertex_epipolar_se3.h"
 #include "edge_epipolar_se3.h"
+#include "types_tutorial_epipolar_slam.h"
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include "g2o/core/sparse_optimizer.h"
+#include "g2o/core/block_solver.h"
+#include "g2o/core/factory.h"
+#include "g2o/core/optimization_algorithm_factory.h"
+#include "g2o/core/optimization_algorithm_gauss_newton.h"
+#include "g2o/solvers/eigen/linear_solver_eigen.h"
 
 using namespace std;
 using namespace g2o;
 using namespace g2o::tutorial;
 
-void test_se3(){
-    SE3 pose(1, 0, 0, 0, 0, 0);
-    SE3 pose2(2, 0, 0, 0, 0, 0);
-    SE3 pose3(3, 0, 0, 0, 0, 0);
-    Eigen::Vector3d v(4, 0, 0);
-    pose = pose * pose2;
-    std::cout << pose.toVector() << std::endl << std::endl;
-    pose2 *= pose2;
-    std::cout << pose2.toVector() << std::endl << std::endl;
-    v = pose3 * v;
-    std::cout << v << std::endl << std::endl;
-    std::cout << pose3.inverse().toVector() << std::endl << std::endl;
-}
+int main()
+{
+  // TODO simulate different sensor offset
+  // simulate a robot observing landmarks while travelling on a grid
+  SE3 sensorOffsetTransf(0.2, 0.1, 0.0, -0.01, -0.01, -0.01);
+  int numNodes = 300;
+  Simulator simulator;
+  simulator.simulate(numNodes, sensorOffsetTransf);
 
-void test_vertex_se3(){
-    VertexEpipolarSE3 vse3;
-    std::cout << "Testing VertexEpipolarSE3" << std::endl << std::endl;
-}
+  /*********************************************************************************
+   * creating the optimization problem
+   ********************************************************************************/
 
-void test_edge_se3(){
-    EdgeEpipolarSE3 edge_se3;
-    std::cout << "Testing EdgeEpipolarSE3" << std::endl << std::endl;
-}
+  typedef BlockSolver< BlockSolverTraits<-1, -1> >  SlamBlockSolver;
+  typedef LinearSolverEigen<SlamBlockSolver::PoseMatrixType> SlamLinearSolver;
 
-int main(){
-    test_se3();
-    test_vertex_se3();
-    test_edge_se3();
+  // allocating the optimizer
+  SparseOptimizer optimizer;
+  auto linearSolver = g2o::make_unique<SlamLinearSolver>();
+  linearSolver->setBlockOrdering(false);
+  OptimizationAlgorithmGaussNewton* solver = new OptimizationAlgorithmGaussNewton(
+    g2o::make_unique<SlamBlockSolver>(std::move(linearSolver)));
+
+  optimizer.setAlgorithm(solver);
+
+  // add the parameter representing the sensor offset
+  ParameterEpipolarSE3Offset* sensorOffset = new ParameterEpipolarSE3Offset;
+  sensorOffset->setOffset(sensorOffsetTransf);
+  sensorOffset->setId(0);
+  optimizer.addParameter(sensorOffset);
+
+  // adding the odometry to the optimizer
+  // first adding all the vertices
+  cerr << "Optimization: Adding robot poses ... ";
+  for (size_t i = 0; i < simulator.poses().size(); ++i) {
+    const Simulator::GridPose& p = simulator.poses()[i];
+    const SE3& t = p.simulatorPose;
+    VertexEpipolarSE3* robot =  new VertexEpipolarSE3;
+    robot->setId(p.id);
+    robot->setEstimate(t);
+    optimizer.addVertex(robot);
+  }
+  cerr << "done." << endl;
+
+  // second add the odometry constraints
+  // cerr << "Optimization: Adding odometry measurements ... ";
+  // for (size_t i = 0; i < simulator.odometry().size(); ++i) {
+  //   const Simulator::GridEdge& simEdge = simulator.odometry()[i];
+
+  //   EdgeSE2* odometry = new EdgeSE2;
+  //   odometry->vertices()[0] = optimizer.vertex(simEdge.from);
+  //   odometry->vertices()[1] = optimizer.vertex(simEdge.to);
+  //   odometry->setMeasurement(simEdge.simulatorTransf);
+  //   odometry->setInformation(simEdge.information);
+  //   optimizer.addEdge(odometry);
+  // }
+  // cerr << "done." << endl;
+
+  // add the landmark observations
+  // cerr << "Optimization: add landmark vertices ... ";
+  // for (size_t i = 0; i < simulator.landmarks().size(); ++i) {
+  //   const Simulator::Landmark& l = simulator.landmarks()[i];
+  //   VertexPointXY* landmark = new VertexPointXY;
+  //   landmark->setId(l.id);
+  //   landmark->setEstimate(l.simulatedPose);
+  //   optimizer.addVertex(landmark);
+  // }
+  // cerr << "done." << endl;
+
+  cerr << "Optimization: add landmark observations ... ";
+  for (size_t i = 0; i < simulator.landmarkObservations().size(); ++i) {
+    const Simulator::LandmarkEdge& simEdge = simulator.landmarkObservations()[i];
+    EdgeEpipolarSE3* landmarkObservation =  new EdgeEpipolarSE3;
+    landmarkObservation->vertices()[0] = optimizer.vertex(simEdge.from);
+    landmarkObservation->vertices()[1] = optimizer.vertex(simEdge.to);
+    landmarkObservation->setMeasurement(simEdge.simulatorMeas);
+    landmarkObservation->setInformation(simEdge.information);
+    landmarkObservation->setParameterId(0, sensorOffset->id());
+    optimizer.addEdge(landmarkObservation);
+  }
+  cerr << "done." << endl;
+
+
+  /*********************************************************************************
+   * optimization
+   ********************************************************************************/
+
+  // dump initial state to the disk
+  optimizer.save("tutorial_before.g2o");
+
+  // prepare and run the optimization
+  // fix the first robot pose to account for gauge freedom
+  VertexEpipolarSE3* firstRobotPose = dynamic_cast<VertexEpipolarSE3*>(optimizer.vertex(0));
+  firstRobotPose->setFixed(true);
+  optimizer.setVerbose(true);
+
+  cerr << "Optimizing" << endl;
+  optimizer.initializeOptimization();
+  optimizer.optimize(10);
+  cerr << "done." << endl;
+
+  optimizer.save("tutorial_after.g2o");
+
+  // freeing the graph memory
+  optimizer.clear();
+
+  return 0;
 }

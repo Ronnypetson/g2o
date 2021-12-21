@@ -73,7 +73,7 @@ namespace g2o {
 
       Vector3d transNoise(0.05, 0.01, 0.01);
       Vector3d rotNoise(0.01, 0.01, 0.01);
-      Vector3d landmarkNoise(0.05, 0.05, 0.05);
+      Vector4d landmarkNoise(0.05, 0.05, 0.05, 0.05);
 
       Vector2d bound(boundArea, boundArea);
 
@@ -157,13 +157,15 @@ namespace g2o {
             if (landmarksForCell.size() == 0) {
               for (int i = 0; i < landMarksPerSquareMeter; ++i) {
                 Landmark* l = new Landmark();
-                double offx, offy;
+                double offx, offy, offz;
                 do {
                   offx = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
                   offy = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
-                } while (hypot_sqr(offx, offy) < 0.25*0.25);
+                  offz = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
+                } while (hypot_sqr(offx, offy, offz) < 0.25 * 0.25);
                 l->truePose[0] = cx + offx;
                 l->truePose[1] = cy + offy;
+                l->truePose[2] = offz;
                 landmarksForCell.push_back(l);
               }
             }
@@ -190,7 +192,11 @@ namespace g2o {
               continue;
             for (size_t i = 0; i < landmarksForCell.size(); ++i) {
               Landmark* l = landmarksForCell[i];
-              double dSqr = hypot_sqr(pv.truePose.translation()(0) - l->truePose(0), pv.truePose.translation()(1) - l->truePose(1));
+              double dSqr = hypot_sqr(
+                pv.truePose.translation()(0) - l->truePose(0),
+                pv.truePose.translation()(1) - l->truePose(1),
+                pv.truePose.translation()(2) - l->truePose(2)
+                );
               if (dSqr > maxSensorSqr)
                 continue;
               double obs = Sampler::uniformRand(0.0, 1.0);
@@ -203,6 +209,7 @@ namespace g2o {
                 Vector3d observation = trueObservation;
                 observation[0] += Sampler::gaussRand(0., landmarkNoise[0]);
                 observation[1] += Sampler::gaussRand(0., landmarkNoise[1]);
+                observation[2] += Sampler::gaussRand(0., landmarkNoise[2]);
                 l->simulatedPose = pv.simulatorPose * observation;
               }
               l->seenBy.push_back(pv.id);
@@ -214,33 +221,33 @@ namespace g2o {
       cerr << "done." << endl;
 
       // add the odometry measurements
-      _odometry.clear();
-      cerr << "Simulator: Adding odometry measurements ... ";
-      for (size_t i = 1; i < poses.size(); ++i) {
-        const GridPose& prev = poses[i-1];
-        const GridPose& p = poses[i];
+      // _odometry.clear();
+      // cerr << "Simulator: Adding odometry measurements ... ";
+      // for (size_t i = 1; i < poses.size(); ++i) {
+      //   const GridPose& prev = poses[i-1];
+      //   const GridPose& p = poses[i];
 
-        _odometry.push_back(GridEdge());
-        GridEdge& edge = _odometry.back();
+      //   _odometry.push_back(GridEdge());
+      //   GridEdge& edge = _odometry.back();
 
-        edge.from = prev.id;
-        edge.to = p.id;
-        edge.trueTransf = prev.truePose.inverse() * p.truePose;
-        edge.simulatorTransf = prev.simulatorPose.inverse() * p.simulatorPose;
-        edge.information = information;
-      }
-      cerr << "done." << endl;
+      //   edge.from = prev.id;
+      //   edge.to = p.id;
+      //   edge.trueTransf = prev.truePose.inverse() * p.truePose;
+      //   edge.simulatorTransf = prev.simulatorPose.inverse() * p.simulatorPose;
+      //   edge.information = information;
+      // }
+      // cerr << "done." << endl;
 
       _landmarks.clear();
       _landmarkObservations.clear();
       // add the landmark observations
       {
         cerr << "Simulator: add landmark observations ... ";
-        Matrix3d covariance; covariance.fill(0.);
-        covariance(0, 0) = landmarkNoise[0]*landmarkNoise[0];
-        covariance(1, 1) = landmarkNoise[1]*landmarkNoise[1];
-        covariance(2, 2) = landmarkNoise[2]*landmarkNoise[2];
-        Matrix3d information = covariance.inverse();
+        Matrix2d covariance; covariance.fill(0.);
+        covariance(0, 0) = landmarkNoise[0] * landmarkNoise[0];
+        covariance(1, 1) = landmarkNoise[1] * landmarkNoise[1];
+        // covariance(2, 2) = landmarkNoise[2] * landmarkNoise[2];
+        Matrix2d information = covariance.inverse();
 
         for (size_t i = 0; i < poses.size(); ++i) {
           const GridPose& p = poses[i];
@@ -252,35 +259,73 @@ namespace g2o {
           }
         }
 
+        /*
+        Take a pose poses[i], take poses[i].landmark[j], take poses[i].landmark[j].seenBy[k]
+        compute the observations from the two poses
+        */
         for (size_t i = 0; i < poses.size(); ++i) {
           const GridPose& p = poses[i];
           SE3 trueInv = (p.truePose * sensorOffset).inverse();
           for (size_t j = 0; j < p.landmarks.size(); ++j) {
             Landmark* l = p.landmarks[j];
-            Vector3d observation;
-            Vector3d trueObservation = trueInv * l->truePose;
-            observation = trueObservation;
-            if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) { // write the initial position of the landmark
-              observation = (p.simulatorPose * sensorOffset).inverse() * l->simulatedPose;
-            } else {
-              // create observation for the LANDMARK using the true positions
-              observation[0] += Sampler::gaussRand(0., landmarkNoise[0]);
-              observation[1] += Sampler::gaussRand(0., landmarkNoise[1]);
+
+            for (size_t k = 0; k < l->seenBy.size(); ++k) {
+              const GridPose& p_tgt = poses[l->seenBy[k]];
+              SE3 trueInv_tgt = (p_tgt.truePose * sensorOffset).inverse();
+
+              Vector3d observation;
+              Vector3d trueObservation = trueInv * l->truePose;
+              observation = trueObservation;
+
+              Vector3d observation_tgt;
+              Vector3d trueObservation_tgt = trueInv_tgt * l->truePose;
+              observation_tgt = trueObservation_tgt;
+
+              if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) { // write the initial position of the landmark
+                observation = (p.simulatorPose * sensorOffset).inverse() * l->simulatedPose;
+              } else {
+                // create observation for the LANDMARK using the true positions
+                observation[0] += Sampler::gaussRand(0., landmarkNoise[0]);
+                observation[1] += Sampler::gaussRand(0., landmarkNoise[1]);
+                observation[2] += Sampler::gaussRand(0., landmarkNoise[2]);
+              }
+
+              if (l->seenBy.size() > 0 && l->seenBy[0] == p_tgt.id) { // write the initial position of the landmark
+                observation_tgt = (p_tgt.simulatorPose * sensorOffset).inverse() * l->simulatedPose;
+              } else {
+                // create observation for the LANDMARK using the true positions
+                observation_tgt[0] += Sampler::gaussRand(0., landmarkNoise[0]);
+                observation_tgt[1] += Sampler::gaussRand(0., landmarkNoise[1]);
+                observation_tgt[2] += Sampler::gaussRand(0., landmarkNoise[2]);
+              }
+
+              _landmarkObservations.push_back(LandmarkEdge());
+              LandmarkEdge& le = _landmarkObservations.back();
+
+              Eigen::Vector4d trueObservation4d, observation4d;
+              double z = trueObservation(2);
+              double z_tgt = trueObservation_tgt(2);
+              trueObservation4d << trueObservation(0) / z,
+                                   trueObservation(1) / z,
+                                   trueObservation_tgt(0) / z_tgt,
+                                   trueObservation_tgt(1) / z_tgt;
+              z = observation(2);
+              z_tgt = observation_tgt(2);
+              observation4d << observation(0) / z,
+                               observation(1) / z,
+                               observation_tgt(0) / z_tgt,
+                               observation_tgt(1) / z_tgt;
+              le.from = p.id;
+              le.to = p_tgt.id;
+              le.trueMeas = trueObservation4d;
+              le.simulatorMeas = observation4d;
+              le.information = information;
             }
 
-            _landmarkObservations.push_back(LandmarkEdge());
-            LandmarkEdge& le = _landmarkObservations.back();
-
-            le.from = p.id;
-            le.to = l->id;
-            le.trueMeas = trueObservation;
-            le.simulatorMeas = observation;
-            le.information = information;
           }
         }
         cerr << "done." << endl;
       }
-
 
       // cleaning up
       for (LandmarkGrid::iterator it = grid.begin(); it != grid.end(); ++it) {
