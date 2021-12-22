@@ -57,9 +57,7 @@ namespace g2o {
           Eigen::Vector2d p1;
           p0 << _measurement.block<2, 1>(0, 0);
           p1 << _measurement.block<2, 1>(2, 0);
-          Eigen::Matrix4d pose_0wrt1 = (v0->estimate() * v1->estimate().inverse()).toMatrix();
-          Eigen::Matrix3d R = pose_0wrt1.block<3, 3>(0, 0);
-          Eigen::Vector3d t = pose_0wrt1.block<3, 1>(0, 3);
+          Eigen::Matrix4d pose_0wrt1 = (v1->estimate().inverse() * v0->estimate()).toMatrix();
           Eigen::Matrix4d pose_1wrt0 = pose_0wrt1.inverse();
           // Optimization for the above line:
           // Eigen::Matrix4d pose_1wrt0 << 0, 0, 0, 0,
@@ -68,13 +66,17 @@ namespace g2o {
           //                               0, 0, 0, 1;
           // pose_1wrt0.block<3, 3>(0, 0) = R.transpose();
           // pose_1wrt0.block<3, 1>(0, 3) = -R.transpose() * t;
+          // Eigen::Matrix3d R = pose_0wrt1.block<3, 3>(0, 0);
+          // Eigen::Vector3d t = pose_0wrt1.block<3, 1>(0, 3);
+          Eigen::Matrix3d R = pose_1wrt0.block<3, 3>(0, 0).transpose();
+          Eigen::Vector3d t = pose_1wrt0.block<3, 1>(0, 3);
           Eigen::Matrix<double, 2, 3> _p1;
           _p1 << 1.0, 0.0, -p1(0),
                  0.0, 1.0, -p1(1);
           Eigen::Vector2d A, B;
           Eigen::Vector3d hp0;
           hp0 << p0(0), p0(1), 1.0;
-          A = _p1 * t;
+          A = _p1 * R * t;
           B = _p1 * R * hp0;
           double d = A.norm() / B.norm();
           // 2D to 3D homogeneous
@@ -85,7 +87,7 @@ namespace g2o {
           Hdhp0.block<3, 1>(0, 0) = dhp0;
           Hdhp0(3) = 1.0;
           // Reproject and compute residual
-          THdhp0 = pose_1wrt0 * Hdhp0;
+          THdhp0 = pose_0wrt1 * Hdhp0;
           Eigen::Vector2d piTHdhp0;
           piTHdhp0 = THdhp0.block<2, 1>(0, 0) / THdhp0(2);
           _error = piTHdhp0 - p1;

@@ -100,6 +100,12 @@ inline T hypot_sqr(T x, T y)
   return x*x + y*y;
 }
 
+template <typename T>
+inline T hypot_sqr(T x, T y, T z)
+{
+  return x*x + y*y + z*z;
+}
+
 /**
  * convert from degree to radian
  */

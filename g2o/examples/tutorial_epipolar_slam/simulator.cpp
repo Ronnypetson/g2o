@@ -71,7 +71,7 @@ namespace g2o {
 
       int landmarksRange=2;
 
-      Vector3d transNoise(0.05, 0.01, 0.01);
+      Vector3d transNoise(0.01, 0.01, 0.01);
       Vector3d rotNoise(0.01, 0.01, 0.01);
       Vector4d landmarkNoise(0.05, 0.05, 0.05, 0.05);
 
@@ -81,19 +81,6 @@ namespace g2o {
       probLimits.resize(MO_NUM_ELEMS);
       for (int i = 0; i < probLimits.size(); ++i)
         probLimits[i] = (i + 1) / (double) MO_NUM_ELEMS;
-
-      Eigen::Matrix<double, 6, 6> covariance;
-      covariance.fill(0.);
-      /*
-      TODO: Check later.
-      */
-      covariance(0, 0) = transNoise[0] * transNoise[0];
-      covariance(1, 1) = transNoise[1] * transNoise[1];
-      covariance(2, 2) = transNoise[2] * transNoise[2];
-      covariance(3, 3) = rotNoise[0] * rotNoise[0];
-      covariance(4, 4) = rotNoise[1] * rotNoise[1];
-      covariance(5, 5) = rotNoise[2] * rotNoise[2];
-      Eigen::Matrix<double, 6, 6> information = covariance.inverse();
 
       SE3 maxStepTransf(stepLen * steps, 0, 0, 0, 0, 0);
       Simulator::PosesVector& poses = _poses;
@@ -161,11 +148,11 @@ namespace g2o {
                 do {
                   offx = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
                   offy = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
-                  offz = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
-                } while (hypot_sqr(offx, offy, offz) < 0.25 * 0.25);
+                  // offz = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
+                } while (hypot_sqr(offx, offy) < 0.25 * 0.25);
                 l->truePose[0] = cx + offx;
                 l->truePose[1] = cy + offy;
-                l->truePose[2] = offz;
+                l->truePose[2] = 0.0;
                 landmarksForCell.push_back(l);
               }
             }
@@ -220,33 +207,16 @@ namespace g2o {
       }
       cerr << "done." << endl;
 
-      // add the odometry measurements
-      // _odometry.clear();
-      // cerr << "Simulator: Adding odometry measurements ... ";
-      // for (size_t i = 1; i < poses.size(); ++i) {
-      //   const GridPose& prev = poses[i-1];
-      //   const GridPose& p = poses[i];
-
-      //   _odometry.push_back(GridEdge());
-      //   GridEdge& edge = _odometry.back();
-
-      //   edge.from = prev.id;
-      //   edge.to = p.id;
-      //   edge.trueTransf = prev.truePose.inverse() * p.truePose;
-      //   edge.simulatorTransf = prev.simulatorPose.inverse() * p.simulatorPose;
-      //   edge.information = information;
-      // }
-      // cerr << "done." << endl;
-
       _landmarks.clear();
       _landmarkObservations.clear();
       // add the landmark observations
       {
         cerr << "Simulator: add landmark observations ... ";
         Matrix2d covariance; covariance.fill(0.);
-        covariance(0, 0) = landmarkNoise[0] * landmarkNoise[0];
-        covariance(1, 1) = landmarkNoise[1] * landmarkNoise[1];
-        // covariance(2, 2) = landmarkNoise[2] * landmarkNoise[2];
+        covariance(0, 0) = landmarkNoise[0] * landmarkNoise[0] + landmarkNoise[2] * landmarkNoise[2];
+        covariance(1, 1) = landmarkNoise[1] * landmarkNoise[1] + landmarkNoise[3] * landmarkNoise[3];
+        // covariance(0, 0) = 1.0;
+        // covariance(1, 1) = 1.0;
         Matrix2d information = covariance.inverse();
 
         for (size_t i = 0; i < poses.size(); ++i) {
@@ -273,48 +243,23 @@ namespace g2o {
               const GridPose& p_tgt = poses[l->seenBy[k]];
               SE3 trueInv_tgt = (p_tgt.truePose * sensorOffset).inverse();
 
-              Vector3d observation;
               Vector3d trueObservation = trueInv * l->truePose;
-              observation = trueObservation;
-
-              Vector3d observation_tgt;
               Vector3d trueObservation_tgt = trueInv_tgt * l->truePose;
-              observation_tgt = trueObservation_tgt;
+              Eigen::Vector4d trueObservation4d, observation4d;
 
-              if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) { // write the initial position of the landmark
-                observation = (p.simulatorPose * sensorOffset).inverse() * l->simulatedPose;
-              } else {
-                // create observation for the LANDMARK using the true positions
-                observation[0] += Sampler::gaussRand(0., landmarkNoise[0]);
-                observation[1] += Sampler::gaussRand(0., landmarkNoise[1]);
-                observation[2] += Sampler::gaussRand(0., landmarkNoise[2]);
-              }
+              trueObservation4d(0) = trueObservation(0) / trueObservation(2);
+              trueObservation4d(1) = trueObservation(1) / trueObservation(2);
+              trueObservation4d(2) = trueObservation_tgt(0) / trueObservation_tgt(2);
+              trueObservation4d(3) = trueObservation_tgt(1) / trueObservation_tgt(2);
 
-              if (l->seenBy.size() > 0 && l->seenBy[0] == p_tgt.id) { // write the initial position of the landmark
-                observation_tgt = (p_tgt.simulatorPose * sensorOffset).inverse() * l->simulatedPose;
-              } else {
-                // create observation for the LANDMARK using the true positions
-                observation_tgt[0] += Sampler::gaussRand(0., landmarkNoise[0]);
-                observation_tgt[1] += Sampler::gaussRand(0., landmarkNoise[1]);
-                observation_tgt[2] += Sampler::gaussRand(0., landmarkNoise[2]);
-              }
+              observation4d(0) = trueObservation4d(0) + Sampler::gaussRand(0.0, landmarkNoise[0]);
+              observation4d(1) = trueObservation4d(1) + Sampler::gaussRand(0.0, landmarkNoise[1]);
+              observation4d(2) = trueObservation4d(2) + Sampler::gaussRand(0.0, landmarkNoise[2]);
+              observation4d(3) = trueObservation4d(3) + Sampler::gaussRand(0.0, landmarkNoise[3]);
 
               _landmarkObservations.push_back(LandmarkEdge());
               LandmarkEdge& le = _landmarkObservations.back();
 
-              Eigen::Vector4d trueObservation4d, observation4d;
-              double z = trueObservation(2);
-              double z_tgt = trueObservation_tgt(2);
-              trueObservation4d << trueObservation(0) / z,
-                                   trueObservation(1) / z,
-                                   trueObservation_tgt(0) / z_tgt,
-                                   trueObservation_tgt(1) / z_tgt;
-              z = observation(2);
-              z_tgt = observation_tgt(2);
-              observation4d << observation(0) / z,
-                               observation(1) / z,
-                               observation_tgt(0) / z_tgt,
-                               observation_tgt(1) / z_tgt;
               le.from = p.id;
               le.to = p_tgt.id;
               le.trueMeas = trueObservation4d;
@@ -352,12 +297,15 @@ namespace g2o {
     {
       switch (motionDirection) {
         case MO_LEFT:
-          return SE3(stepLen, 0, 0.5*M_PI, 0, 0, 0);
+          // return SE3(0.1 * stepLen, 0, 0.5*M_PI, 0, 0, 0);
+          return SE3(stepLen, 0, 0, 0, 0.2, 0);
         case MO_RIGHT:
-          return SE3(stepLen, 0, -0.5*M_PI, 0, 0, 0);
+          // return SE3(0.1 * stepLen, 0, -0.5*M_PI, 0, 0, 0);
+          return SE3(stepLen, 0, 0, 0, 0, 0.2);
         default:
           cerr << "Unknown motion direction" << endl;
-          return SE3(stepLen, 0, -0.5*M_PI, 0, 0, 0);
+          // return SE3(0.1 * stepLen, 0, -0.5*M_PI, 0, 0, 0);
+          return SE3(stepLen, 0, 0, 0.2, 0, 0);
       }
     }
 
@@ -368,9 +316,9 @@ namespace g2o {
           trueMotion[0] + Sampler::gaussRand(0.0, transNoise[0]),
           trueMotion[1] + Sampler::gaussRand(0.0, transNoise[1]),
           trueMotion[2] + Sampler::gaussRand(0.0, transNoise[2]),
-          trueMotion[3] + Sampler::gaussRand(0.0, transNoise[3]),
-          trueMotion[4] + Sampler::gaussRand(0.0, transNoise[4]),
-          trueMotion[5] + Sampler::gaussRand(0.0, transNoise[5])
+          trueMotion[3] + Sampler::gaussRand(0.0, rotNoise[0]),
+          trueMotion[4] + Sampler::gaussRand(0.0, rotNoise[1]),
+          trueMotion[5] + Sampler::gaussRand(0.0, rotNoise[2])
           );
       return noiseMotion;
     }
