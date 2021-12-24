@@ -86,18 +86,19 @@ namespace g2o {
         }
 
         Eigen::Vector3d operator * (const Eigen::Vector3d& v) const {
-          Eigen::Vector4d v_hom;
+          Eigen::Vector4d v_hom, u_hom;
           v_hom << v(0), v(1), v(2), 1.0;
           SE3 tmp(*this);
           Eigen::Matrix4d exp_T = Sophus::SE3<double>::exp(tmp.toVector()).matrix();
-          return (exp_T * v_hom).block<3, 1>(0, 3);
+          u_hom = exp_T * v_hom;
+          return u_hom.block<3, 1>(0, 0);
         }
 
         SE3 inverse() const{
           SE3 ret;
           SE3 tmp(*this);
           Eigen::Matrix4d exp_T = Sophus::SE3<double>::exp(tmp.toVector()).matrix();
-          exp_T = exp_T.inverse();
+          exp_T = exp_T.inverse().eval();
           Sophus::SE3<double> _result(exp_T);
           Vector6 vec_result = _result.log();
           ret._t = vec_result.block<3, 1>(0, 0);

@@ -77,6 +77,8 @@ int main()
 
   // adding the odometry to the optimizer
   // first adding all the vertices
+  vector<VertexEpipolarSE3*> vertices;
+  vector<EdgeEpipolarSE3*> edges;
   cerr << "Optimization: Adding robot poses ... ";
   for (size_t i = 0; i < simulator.poses().size(); ++i) {
     const Simulator::GridPose& p = simulator.poses()[i];
@@ -85,6 +87,7 @@ int main()
     robot->setId(p.id);
     robot->setEstimate(t);
     optimizer.addVertex(robot);
+    vertices.push_back(robot);
   }
   cerr << "done." << endl;
 
@@ -123,6 +126,7 @@ int main()
     landmarkObservation->setInformation(simEdge.information);
     landmarkObservation->setParameterId(0, sensorOffset->id());
     optimizer.addEdge(landmarkObservation);
+    edges.push_back(landmarkObservation);
   }
   cerr << "done." << endl;
 
@@ -146,6 +150,36 @@ int main()
   cerr << "done." << endl;
 
   optimizer.save("tutorial_after.g2o");
+
+  // write output
+  ofstream fileOutputStream;
+  if ("epipolar_SE3.g2o" != "-") {
+    cerr << "Writing into " << "epipolar_SE3.g2o" << endl;
+    fileOutputStream.open("epipolar_SE3.g2o"); // .c_str()
+  } else {
+    cerr << "writing to stdout" << endl;
+  }
+
+  string vertexTag = "VERTEX_SE3:QUAT"; // Factory::instance()->tag(vertices[0]);
+  string edgeTag = "EDGE_SE3:QUAT"; // Factory::instance()->tag(edges[0]);
+
+  ostream& fout = "epipolar_SE3.g2o" != "-" ? fileOutputStream : cout;
+  for (size_t i = 0; i < vertices.size(); ++i) {
+    VertexEpipolarSE3* v = vertices[i];
+    fout << vertexTag << " " << v->id() << " ";
+    v->write(fout);
+    fout << endl;
+  }
+
+  for (size_t i = 0; i < edges.size(); ++i) {
+    EdgeEpipolarSE3* e = edges[i];
+    VertexEpipolarSE3* from = static_cast<VertexEpipolarSE3*>(e->vertex(0));
+    VertexEpipolarSE3* to = static_cast<VertexEpipolarSE3*>(e->vertex(1));
+    fout << edgeTag << " " << from->id() << " " << to->id() << " ";
+    e->write(fout);
+    fout << "0 0 0 0 0 10000 0 0 0 0 10000 0 0 0 40000 0 0 40000 0 40000";
+    fout << endl;
+  }
 
   // freeing the graph memory
   optimizer.clear();

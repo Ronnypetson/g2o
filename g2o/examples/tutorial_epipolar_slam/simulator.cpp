@@ -60,20 +60,20 @@ namespace g2o {
     void Simulator::simulate(int numNodes, const SE3& sensorOffset)
     {
       // simulate a robot observing landmarks while travelling on a grid
-      int steps = 5;
-      double stepLen = 1.0;
+      int steps = 2;
+      double stepLen = 0.5;
       int boundArea = 50;
 
-      double maxSensorRangeLandmarks = 2.5 * stepLen;
+      double maxSensorRangeLandmarks = 5 * stepLen;
 
       int landMarksPerSquareMeter = 1;
       double observationProb = 0.8;
 
-      int landmarksRange=2;
+      int landmarksRange = 2;
 
-      Vector3d transNoise(0.01, 0.01, 0.01);
-      Vector3d rotNoise(0.01, 0.01, 0.01);
-      Vector4d landmarkNoise(0.05, 0.05, 0.05, 0.05);
+      Vector3d transNoise(0.0, 0.0, 0.0);
+      Vector3d rotNoise(0.0, 0.0, 0.0);
+      Vector4d landmarkNoise(0.0, 0.0, 0.0, 0.0);
 
       Vector2d bound(boundArea, boundArea);
 
@@ -136,6 +136,7 @@ namespace g2o {
       for (PosesVector::const_iterator it = poses.begin(); it != poses.end(); ++it) {
         int ccx = (int)round(it->truePose.translation()(0));
         int ccy = (int)round(it->truePose.translation()(1));
+        int ccz = (int)round(it->truePose.translation()(2));
         for (int a=-landmarksRange; a<=landmarksRange; a++)
           for (int b=-landmarksRange; b<=landmarksRange; b++){
             int cx=ccx+a;
@@ -148,11 +149,11 @@ namespace g2o {
                 do {
                   offx = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
                   offy = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
-                  // offz = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
+                  offz = Sampler::uniformRand(1*stepLen, 2*stepLen);
                 } while (hypot_sqr(offx, offy) < 0.25 * 0.25);
                 l->truePose[0] = cx + offx;
                 l->truePose[1] = cy + offy;
-                l->truePose[2] = 0.0;
+                l->truePose[2] = ccz + offz;
                 landmarksForCell.push_back(l);
               }
             }
@@ -163,6 +164,8 @@ namespace g2o {
       cerr << "Simulator: Simulating landmark observations for the poses ... ";
       double maxSensorSqr = maxSensorRangeLandmarks * maxSensorRangeLandmarks;
       int globalId = 0;
+      int _index = 0;
+      std::map<int, int> globalId2PoseIndex;
       for (PosesVector::iterator it = poses.begin(); it != poses.end(); ++it) {
         Simulator::GridPose& pv = *it;
         int cx = (int)round(it->truePose.translation()(0));
@@ -170,6 +173,8 @@ namespace g2o {
         int numGridCells = (int)(maxSensorRangeLandmarks) + 1;
 
         pv.id = globalId++;
+        globalId2PoseIndex[pv.id] = _index;
+        _index++;
         SE3 trueInv = pv.truePose.inverse();
 
         for (int xx = cx - numGridCells; xx <= cx + numGridCells; ++xx)
@@ -180,9 +185,9 @@ namespace g2o {
             for (size_t i = 0; i < landmarksForCell.size(); ++i) {
               Landmark* l = landmarksForCell[i];
               double dSqr = hypot_sqr(
-                pv.truePose.translation()(0) - l->truePose(0),
-                pv.truePose.translation()(1) - l->truePose(1),
-                pv.truePose.translation()(2) - l->truePose(2)
+                  pv.truePose.translation()(0) - l->truePose(0),
+                  pv.truePose.translation()(1) - l->truePose(1),
+                  pv.truePose.translation()(2) - l->truePose(2)
                 );
               if (dSqr > maxSensorSqr)
                 continue;
@@ -213,21 +218,21 @@ namespace g2o {
       {
         cerr << "Simulator: add landmark observations ... ";
         Matrix2d covariance; covariance.fill(0.);
-        covariance(0, 0) = landmarkNoise[0] * landmarkNoise[0] + landmarkNoise[2] * landmarkNoise[2];
-        covariance(1, 1) = landmarkNoise[1] * landmarkNoise[1] + landmarkNoise[3] * landmarkNoise[3];
-        // covariance(0, 0) = 1.0;
-        // covariance(1, 1) = 1.0;
+        // covariance(0, 0) = landmarkNoise[0] * landmarkNoise[0] + landmarkNoise[2] * landmarkNoise[2];
+        // covariance(1, 1) = landmarkNoise[1] * landmarkNoise[1] + landmarkNoise[3] * landmarkNoise[3];
+        covariance(0, 0) = 1.0;
+        covariance(1, 1) = 1.0;
         Matrix2d information = covariance.inverse();
 
-        for (size_t i = 0; i < poses.size(); ++i) {
-          const GridPose& p = poses[i];
-          for (size_t j = 0; j < p.landmarks.size(); ++j) {
-            Landmark* l = p.landmarks[j];
-            if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) {
-              landmarks.push_back(*l);
-            }
-          }
-        }
+        // for (size_t i = 0; i < poses.size(); ++i) {
+        //   const GridPose& p = poses[i];
+        //   for (size_t j = 0; j < p.landmarks.size(); ++j) {
+        //     Landmark* l = p.landmarks[j];
+        //     if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) {
+        //       landmarks.push_back(*l);
+        //     }
+        //   }
+        // }
 
         /*
         Take a pose poses[i], take poses[i].landmark[j], take poses[i].landmark[j].seenBy[k]
@@ -240,7 +245,13 @@ namespace g2o {
             Landmark* l = p.landmarks[j];
 
             for (size_t k = 0; k < l->seenBy.size(); ++k) {
-              const GridPose& p_tgt = poses[l->seenBy[k]];
+              int _poseIndex = globalId2PoseIndex[l->seenBy[k]];
+              const GridPose& p_tgt = poses[_poseIndex];
+
+              if (p.id == p_tgt.id) {
+                continue;
+              }
+
               SE3 trueInv_tgt = (p_tgt.truePose * sensorOffset).inverse();
 
               Vector3d trueObservation = trueInv * l->truePose;
@@ -301,11 +312,11 @@ namespace g2o {
           return SE3(stepLen, 0, 0, 0, 0.2, 0);
         case MO_RIGHT:
           // return SE3(0.1 * stepLen, 0, -0.5*M_PI, 0, 0, 0);
-          return SE3(stepLen, 0, 0, 0, 0, 0.2);
+          return SE3(0, stepLen, 0, 0, 0, 0.2);
         default:
           cerr << "Unknown motion direction" << endl;
           // return SE3(0.1 * stepLen, 0, -0.5*M_PI, 0, 0, 0);
-          return SE3(stepLen, 0, 0, 0.2, 0, 0);
+          return SE3(0, 0, stepLen, 0.2, 0, 0);
       }
     }
 
