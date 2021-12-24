@@ -95,12 +95,12 @@ namespace g2o {
       cerr << "Simulator: sampling nodes ...";
       while ((int)poses.size() < numNodes) {
         // add straight motions
-        for (int i = 1; i < steps && (int)poses.size() < numNodes; ++i) {
-          Simulator::GridPose nextGridPose = generateNewPose(poses.back(), SE3(stepLen, 0, 0, 0, 0, 0), transNoise, rotNoise);
-          poses.push_back(nextGridPose);
-        }
-        if ((int)poses.size() == numNodes)
-          break;
+        // for (int i = 1; i < steps && (int)poses.size() < numNodes; ++i) {
+        //   Simulator::GridPose nextGridPose = generateNewPose(poses.back(), SE3(stepLen, 0, 0, 0, 0, 0), transNoise, rotNoise);
+        //   poses.push_back(nextGridPose);
+        // }
+        // if ((int)poses.size() == numNodes)
+        //   break;
 
         // sample a new motion direction
         double sampleMove = Sampler::uniformRand(0., 1.);
@@ -149,7 +149,7 @@ namespace g2o {
                 do {
                   offx = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
                   offy = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
-                  offz = Sampler::uniformRand(1*stepLen, 2*stepLen);
+                  offz = Sampler::uniformRand(1*stepLen, 4*stepLen);
                 } while (hypot_sqr(offx, offy) < 0.25 * 0.25);
                 l->truePose[0] = cx + offx;
                 l->truePose[1] = cy + offy;
@@ -194,10 +194,12 @@ namespace g2o {
               double obs = Sampler::uniformRand(0.0, 1.0);
               if (obs > observationProb) // we do not see this one...
                 continue;
+              Vector3d trueObservation = trueInv * l->truePose;
+              if (trueObservation[2] < 1.0)
+                continue;
               if (l->id < 0)
                 l->id = globalId++;
               if (l->seenBy.size() == 0) {
-                Vector3d trueObservation = trueInv * l->truePose;
                 Vector3d observation = trueObservation;
                 observation[0] += Sampler::gaussRand(0., landmarkNoise[0]);
                 observation[1] += Sampler::gaussRand(0., landmarkNoise[1]);

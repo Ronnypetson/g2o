@@ -49,7 +49,7 @@ int main()
   // TODO simulate different sensor offset
   // simulate a robot observing landmarks while travelling on a grid
   SE3 sensorOffsetTransf(0.0, 0.0, 0.0, -0.0, -0.0, -0.0);
-  int numNodes = 2;
+  int numNodes = 4;
   Simulator simulator;
   simulator.simulate(numNodes, sensorOffsetTransf);
 

@@ -91,6 +91,9 @@ namespace g2o {
           Eigen::Vector2d piTHdhp0;
           piTHdhp0 = THdhp0.block<2, 1>(0, 0) / THdhp0(2);
           _error = piTHdhp0 - p1;
+          // double _error_norm = _error.norm();
+          // int a;
+          // a += 1;
         }
 
         void setMeasurement(const Eigen::Vector4d& m){
