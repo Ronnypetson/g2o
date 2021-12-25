@@ -57,7 +57,7 @@ namespace g2o {
           Eigen::Vector2d p1;
           p0 << _measurement.block<2, 1>(0, 0);
           p1 << _measurement.block<2, 1>(2, 0);
-          Eigen::Matrix4d pose_0wrt1 = (v0->estimate() * v1->estimate().inverse()).toMatrix();
+          Eigen::Matrix4d pose_0wrt1 = (v1->estimate().inverse() * v0->estimate()).toMatrix();
           Eigen::Matrix4d pose_1wrt0 = pose_0wrt1.inverse();
           // Optimization for the above line:
           // Eigen::Matrix4d pose_1wrt0 << 0, 0, 0, 0,

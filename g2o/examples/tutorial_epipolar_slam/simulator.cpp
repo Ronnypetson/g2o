@@ -310,12 +310,12 @@ namespace g2o {
     {
       switch (motionDirection) {
         case MO_LEFT:
-          return SE3(stepLen, 0, stepLen, 0, 0, 0);
+          return SE3(stepLen, 0, stepLen, 0.0, 0.0, 0.2);
         case MO_RIGHT:
-          return SE3(0, stepLen, stepLen, 0, 0, 0);
+          return SE3(0, stepLen, stepLen, 0.0, 0.2, 0.0);
         default:
           cerr << "Unknown motion direction" << endl;
-          return SE3(stepLen, stepLen, stepLen, 0, 0, 0);
+          return SE3(stepLen, stepLen, 0, 0.2, 0.0, 0.0);
       }
     }
 

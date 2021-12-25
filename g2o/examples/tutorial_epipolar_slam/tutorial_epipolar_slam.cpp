@@ -47,12 +47,8 @@ using namespace g2o::tutorial;
 void write_output(vector<VertexEpipolarSE3>& vertices, vector<EdgeEpipolarSE3>& edges){
   // write output
   ofstream fileOutputStream;
-  if ("epipolar_SE3.g2o" != "-") {
-    cerr << "Writing into " << "epipolar_SE3.g2o" << endl;
-    fileOutputStream.open("epipolar_SE3.g2o"); // .c_str()
-  } else {
-    cerr << "writing to stdout" << endl;
-  }
+  cerr << "Writing into " << "epipolar_SE3.g2o" << endl;
+  fileOutputStream.open("epipolar_SE3.g2o"); // .c_str()
 
   string vertexTag = "VERTEX_SE3:QUAT"; // Factory::instance()->tag(vertices[0]) + ":QUAT"; //
   string edgeTag = "EDGE_SE3:QUAT"; // Factory::instance()->tag(edges[0]) + ":QUAT"; // 
@@ -137,8 +133,6 @@ int main()
   }
   cerr << "done." << endl;
 
-  // write_output(vertices, edges);
-
   /*********************************************************************************
    * optimization
    ********************************************************************************/
@@ -154,7 +148,7 @@ int main()
 
   cerr << "Optimizing" << endl;
   optimizer.initializeOptimization();
-  optimizer.optimize(10);
+  optimizer.optimize(5);
   write_output(vertices, edges);
   cerr << "done." << endl;
 
