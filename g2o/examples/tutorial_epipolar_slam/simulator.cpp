@@ -61,12 +61,12 @@ namespace g2o {
     {
       // simulate a robot observing landmarks while travelling on a grid
       int steps = 2;
-      double stepLen = 0.5;
+      double stepLen = 1.0;
       int boundArea = 50;
 
-      double maxSensorRangeLandmarks = 5 * stepLen;
+      double maxSensorRangeLandmarks = 10.0 * stepLen;
 
-      int landMarksPerSquareMeter = 1;
+      int landMarksPerSquareMeter = 5;
       double observationProb = 0.8;
 
       int landmarksRange = 2;
@@ -149,7 +149,7 @@ namespace g2o {
                 do {
                   offx = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
                   offy = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
-                  offz = Sampler::uniformRand(1*stepLen, 4*stepLen);
+                  offz = Sampler::uniformRand(1*stepLen, 2*stepLen);
                 } while (hypot_sqr(offx, offy) < 0.25 * 0.25);
                 l->truePose[0] = cx + offx;
                 l->truePose[1] = cy + offy;
@@ -310,15 +310,12 @@ namespace g2o {
     {
       switch (motionDirection) {
         case MO_LEFT:
-          // return SE3(0.1 * stepLen, 0, 0.5*M_PI, 0, 0, 0);
-          return SE3(stepLen, 0, 0, 0, 0.2, 0);
+          return SE3(stepLen, 0, stepLen, 0, 0, 0);
         case MO_RIGHT:
-          // return SE3(0.1 * stepLen, 0, -0.5*M_PI, 0, 0, 0);
-          return SE3(0, stepLen, 0, 0, 0, 0.2);
+          return SE3(0, stepLen, stepLen, 0, 0, 0);
         default:
           cerr << "Unknown motion direction" << endl;
-          // return SE3(0.1 * stepLen, 0, -0.5*M_PI, 0, 0, 0);
-          return SE3(0, 0, stepLen, 0.2, 0, 0);
+          return SE3(stepLen, stepLen, stepLen, 0, 0, 0);
       }
     }
 
@@ -332,7 +329,7 @@ namespace g2o {
           trueMotion[3] + Sampler::gaussRand(0.0, rotNoise[0]),
           trueMotion[4] + Sampler::gaussRand(0.0, rotNoise[1]),
           trueMotion[5] + Sampler::gaussRand(0.0, rotNoise[2])
-          );
+      );
       return noiseMotion;
     }
 
