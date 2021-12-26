@@ -44,11 +44,11 @@ using namespace std;
 using namespace g2o;
 using namespace g2o::tutorial;
 
-void write_output(vector<VertexEpipolarSE3*>& vertices, vector<EdgeEpipolarSE3*>& edges){
+void write_output(string filename, vector<VertexEpipolarSE3*>& vertices, vector<EdgeEpipolarSE3*>& edges){
   // write output
   ofstream fileOutputStream;
-  cerr << "Writing into " << "epipolar_SE3.g2o" << endl;
-  fileOutputStream.open("epipolar_SE3.g2o"); // .c_str()
+  cerr << "Writing into " << filename << endl; // "epipolar_SE3.g2o"
+  fileOutputStream.open(filename); // .c_str()
 
   string vertexTag = "VERTEX_SE3:QUAT"; // Factory::instance()->tag(vertices[0]) + ":QUAT"; //
   string edgeTag = "EDGE_SE3:QUAT"; // Factory::instance()->tag(edges[0]) + ":QUAT"; // 
@@ -77,7 +77,7 @@ int main()
   // TODO simulate different sensor offset
   // simulate a robot observing landmarks while travelling on a grid
   SE3 sensorOffsetTransf(0.0, 0.0, 0.0, -0.0, -0.0, -0.0);
-  int numNodes = 20;
+  int numNodes = 5;
   Simulator simulator;
   simulator.simulate(numNodes, sensorOffsetTransf);
 
@@ -150,9 +150,10 @@ int main()
   optimizer.setVerbose(true);
 
   cerr << "Optimizing" << endl;
+  write_output("before_epipolar_SE3.g2o", vertices, edges);
   optimizer.initializeOptimization();
   optimizer.optimize(5);
-  write_output(vertices, edges);
+  write_output("after_epipolar_SE3.g2o", vertices, edges);
   cerr << "done." << endl;
 
   optimizer.save("tutorial_after.g2o");
