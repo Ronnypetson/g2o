@@ -29,6 +29,17 @@ def main():
     T_opt = np.fromfile('opt_poses_SE3.T', sep=' ')
     T_opt = np.reshape(T_opt, (-1, 4, 4))
 
+    T_opt_norm = np.copy(T_opt)
+    norm_pose = np.linalg.inv(T[0]) @ T[1]
+    norm_pose_opt = np.linalg.inv(T_opt[0]) @ T_opt[1]
+    norm_const = np.linalg.norm(norm_pose[:3, 3]) / np.linalg.norm(norm_pose_opt[:3, 3])
+    T_opt_norm[:, :3, 3] = T_opt_norm[:, :3, 3] * norm_const
+
+    displacement = np.linalg.inv(T_opt_norm[0]) @ T[0]
+    displacement[:3, :3] = 0.0
+    displacement[3, 3] = 0.0
+    T_opt_norm = np.array([pose + displacement for pose in T_opt_norm])
+
     i = 0
     #sleep(5)
     #pangolin.DisplayBase().RecordOnRender("ffmpeg:[fps=10,bps=8388608,unique_filename]//kitti_00.avi")
@@ -60,6 +71,11 @@ def main():
         for pose in T_opt:
             pangolin.DrawCamera(pose, 0.5/2, 0.75/2, 0.8/2)
         pangolin.DrawLine(T_opt[:i + 1, :3, 3])
+
+        gl.glColor3f(1.0, 0.0, 1.0)
+        for pose in T_opt_norm:
+            pangolin.DrawCamera(pose, 0.5/2, 0.75/2, 0.8/2)
+        pangolin.DrawLine(T_opt_norm[:i + 1, :3, 3])
 
         i = min(i + 1, len(T) - 1)
 
