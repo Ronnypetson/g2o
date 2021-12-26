@@ -62,18 +62,22 @@ namespace g2o {
       // simulate a robot observing landmarks while travelling on a grid
       int steps = 2;
       double stepLen = 1.0;
-      int boundArea = 50;
+      int boundArea = 10;
 
-      double maxSensorRangeLandmarks = 10.0 * stepLen;
+      double maxSensorRangeLandmarks = 5.0 * stepLen;
 
-      int landMarksPerSquareMeter = 5;
+      int landMarksPerSquareMeter = 4;
       double observationProb = 0.8;
 
-      int landmarksRange = 2;
+      int landmarksRange = 5;
+
+      // Vector3d transNoise(0.0, 0.0, 0.0);
+      // Vector3d rotNoise(0.0, 0.0, 0.0);
+      // Vector4d landmarkNoise(0.0, 0.0, 0.0, 0.0);
 
       Vector3d transNoise(0.0, 0.0, 0.0);
       Vector3d rotNoise(0.0, 0.0, 0.0);
-      Vector4d landmarkNoise(0.0, 0.0, 0.0, 0.0);
+      Vector4d landmarkNoise(0.00001, 0.00001, 0.00001, 0.00001);
 
       Vector2d bound(boundArea, boundArea);
 
@@ -89,8 +93,8 @@ namespace g2o {
       landmarks.clear();
       Simulator::GridPose firstPose;
       firstPose.id = 0;
-      firstPose.truePose = SE3(0, 0, 0, 0, 0, 0);
-      firstPose.simulatorPose = SE3(0, 0, 0, 0, 0, 0);
+      firstPose.truePose = SE3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+      firstPose.simulatorPose = firstPose.truePose;
       poses.push_back(firstPose);
       cerr << "Simulator: sampling nodes ...";
       while ((int)poses.size() < numNodes) {
@@ -147,9 +151,9 @@ namespace g2o {
                 Landmark* l = new Landmark();
                 double offx, offy, offz;
                 do {
-                  offx = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
-                  offy = Sampler::uniformRand(-0.5*stepLen, 0.5*stepLen);
-                  offz = Sampler::uniformRand(1*stepLen, 2*stepLen);
+                  offx = Sampler::uniformRand(-5 * stepLen, 5 * stepLen);
+                  offy = Sampler::uniformRand(-5 * stepLen, 5 * stepLen);
+                  offz = Sampler::uniformRand(1 * stepLen, 2 * stepLen);
                 } while (hypot_sqr(offx, offy) < 0.25 * 0.25);
                 l->truePose[0] = cx + offx;
                 l->truePose[1] = cy + offy;

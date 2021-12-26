@@ -44,7 +44,7 @@ using namespace std;
 using namespace g2o;
 using namespace g2o::tutorial;
 
-void write_output(vector<VertexEpipolarSE3>& vertices, vector<EdgeEpipolarSE3>& edges){
+void write_output(vector<VertexEpipolarSE3*>& vertices, vector<EdgeEpipolarSE3*>& edges){
   // write output
   ofstream fileOutputStream;
   cerr << "Writing into " << "epipolar_SE3.g2o" << endl;
@@ -53,20 +53,20 @@ void write_output(vector<VertexEpipolarSE3>& vertices, vector<EdgeEpipolarSE3>& 
   string vertexTag = "VERTEX_SE3:QUAT"; // Factory::instance()->tag(vertices[0]) + ":QUAT"; //
   string edgeTag = "EDGE_SE3:QUAT"; // Factory::instance()->tag(edges[0]) + ":QUAT"; // 
 
-  ostream& fout = "epipolar_SE3.g2o" != "-" ? fileOutputStream : cout;
+  ostream& fout = fileOutputStream;
   for (size_t i = 0; i < vertices.size(); ++i) {
-    VertexEpipolarSE3 v = vertices[i];
-    fout << vertexTag << " " << v.id() << " ";
-    v.write(fout);
+    VertexEpipolarSE3* v = vertices[i];
+    fout << vertexTag << " " << v->id() << " ";
+    v->write(fout);
     fout << endl;
   }
 
   for (size_t i = 0; i < edges.size(); ++i) {
-    EdgeEpipolarSE3 e = edges[i];
-    VertexEpipolarSE3* from = static_cast<VertexEpipolarSE3*>(e.vertex(0));
-    VertexEpipolarSE3* to = static_cast<VertexEpipolarSE3*>(e.vertex(1));
+    EdgeEpipolarSE3* e = edges[i];
+    VertexEpipolarSE3* from = static_cast<VertexEpipolarSE3*>(e->vertex(0));
+    VertexEpipolarSE3* to = static_cast<VertexEpipolarSE3*>(e->vertex(1));
     fout << edgeTag << " " << from->id() << " " << to->id() << " ";
-    e.write(fout);
+    e->write(fout);
     fout << "0 0 0 0 0 10000 0 0 0 0 10000 0 0 0 40000 0 0 40000 0 40000";
     fout << endl;
   }
@@ -77,7 +77,7 @@ int main()
   // TODO simulate different sensor offset
   // simulate a robot observing landmarks while travelling on a grid
   SE3 sensorOffsetTransf(0.0, 0.0, 0.0, -0.0, -0.0, -0.0);
-  int numNodes = 10;
+  int numNodes = 20;
   Simulator simulator;
   simulator.simulate(numNodes, sensorOffsetTransf);
 
@@ -105,8 +105,8 @@ int main()
 
   // adding the odometry to the optimizer
   // first adding all the vertices
-  vector<VertexEpipolarSE3> vertices;
-  vector<EdgeEpipolarSE3> edges;
+  vector<VertexEpipolarSE3*> vertices;
+  vector<EdgeEpipolarSE3*> edges;
   cerr << "Optimization: Adding robot poses ... ";
   for (size_t i = 0; i < simulator.poses().size(); ++i) {
     const Simulator::GridPose& p = simulator.poses()[i];
@@ -114,9 +114,12 @@ int main()
     VertexEpipolarSE3* robot =  new VertexEpipolarSE3;
     robot->setId(p.id);
     robot->setEstimate(t);
+    if (i == 0)
+      robot->setFixed(true);
     optimizer.addVertex(robot);
-    vertices.push_back(*robot);
+    vertices.push_back(robot);
   }
+  // optimizer.activeVertices()[0]->setFixed(true);
   cerr << "done." << endl;
 
   cerr << "Optimization: add landmark observations ... ";
@@ -129,7 +132,7 @@ int main()
     landmarkObservation->setInformation(simEdge.information);
     landmarkObservation->setParameterId(0, sensorOffset->id());
     optimizer.addEdge(landmarkObservation);
-    edges.push_back(*landmarkObservation);
+    edges.push_back(landmarkObservation);
   }
   cerr << "done." << endl;
 

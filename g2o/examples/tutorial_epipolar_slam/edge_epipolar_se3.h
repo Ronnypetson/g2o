@@ -49,51 +49,51 @@ namespace g2o {
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         EdgeEpipolarSE3();
 
+        Eigen::Matrix4d _pose_inverse(Eigen::Matrix4d& pose){
+          Eigen::Matrix4d _inv = Eigen::Matrix4d::Zero();
+          _inv(3, 3) = 1.0;
+          Eigen::Matrix3d R = pose.block<3, 3>(0, 0);
+          Eigen::Vector3d t = pose.block<3, 1>(0, 3);
+          _inv.block<3, 3>(0, 0) = R.transpose();
+          _inv.block<3, 1>(0, 3) = -R.transpose() * t;
+          return _inv;
+        }
+
         void computeError()
         {
           const VertexEpipolarSE3* v0 = static_cast<const VertexEpipolarSE3*>(_vertices[0]);
           const VertexEpipolarSE3* v1 = static_cast<const VertexEpipolarSE3*>(_vertices[1]);
-          Eigen::Vector2d p0;
-          Eigen::Vector2d p1;
+
           p0 << _measurement.block<2, 1>(0, 0);
           p1 << _measurement.block<2, 1>(2, 0);
-          Eigen::Matrix4d pose_0wrt1 = (v1->estimate().inverse() * v0->estimate()).toMatrix();
-          Eigen::Matrix4d pose_1wrt0 = pose_0wrt1.inverse();
-          // Optimization for the above line:
-          // Eigen::Matrix4d pose_1wrt0 << 0, 0, 0, 0,
-          //                               0, 0, 0, 0,
-          //                               0, 0, 0, 0,
-          //                               0, 0, 0, 1;
-          // pose_1wrt0.block<3, 3>(0, 0) = R.transpose();
-          // pose_1wrt0.block<3, 1>(0, 3) = -R.transpose() * t;
-          // Eigen::Matrix3d R = pose_0wrt1.block<3, 3>(0, 0);
-          // Eigen::Vector3d t = pose_0wrt1.block<3, 1>(0, 3);
-          Eigen::Matrix3d R = pose_1wrt0.block<3, 3>(0, 0).transpose();
-          Eigen::Vector3d t = pose_1wrt0.block<3, 1>(0, 3);
-          Eigen::Matrix<double, 2, 3> _p1;
+
+          v0_matrix = v0->estimate().toMatrix();
+          v1_matrix = v1->estimate().toMatrix();
+
+          // Eigen::Matrix4d pose_0wrt1 = (v1->estimate().inverse() * v0->estimate()).toMatrix();
+          // Eigen::Matrix4d pose_1wrt0 = pose_0wrt1.inverse();
+          pose_0wrt1 = _pose_inverse(v1_matrix) * v0_matrix;
+          pose_1wrt0 = _pose_inverse(pose_0wrt1);
+
+          R = pose_1wrt0.block<3, 3>(0, 0).transpose();
+          t = pose_1wrt0.block<3, 1>(0, 3);
+
           _p1 << 1.0, 0.0, -p1(0),
                  0.0, 1.0, -p1(1);
-          Eigen::Vector2d A, B;
-          Eigen::Vector3d hp0;
+
           hp0 << p0(0), p0(1), 1.0;
           A = _p1 * R * t;
           B = _p1 * R * hp0;
-          double d = A.norm() / B.norm();
+          d = A.norm() / B.norm();
           // 2D to 3D homogeneous
-          Eigen::Vector3d dhp0;
           dhp0 << d * p0(0), d * p0(1), d;
           // 3D to 4D homogeneous
-          Eigen::Vector4d Hdhp0, THdhp0;
           Hdhp0.block<3, 1>(0, 0) = dhp0;
           Hdhp0(3) = 1.0;
           // Reproject and compute residual
           THdhp0 = pose_0wrt1 * Hdhp0;
-          Eigen::Vector2d piTHdhp0;
           piTHdhp0 = THdhp0.block<2, 1>(0, 0) / THdhp0(2);
           _error = piTHdhp0 - p1;
-          // double _error_norm = _error.norm();
-          // int a;
-          // a += 1;
         }
 
         void setMeasurement(const Eigen::Vector4d& m){
@@ -109,6 +109,28 @@ namespace g2o {
 
       protected:
         Eigen::Vector4d _inverseMeasurement;
+
+        Eigen::Vector2d p0;
+        Eigen::Vector2d p1;
+
+        Eigen::Matrix4d v0_matrix;
+        Eigen::Matrix4d v1_matrix;
+
+        Eigen::Matrix4d pose_0wrt1;
+        Eigen::Matrix4d pose_1wrt0;
+
+        Eigen::Matrix3d R;
+        Eigen::Vector3d t;
+
+        Eigen::Matrix<double, 2, 3> _p1;
+
+        double d;
+        Eigen::Vector2d A, B;
+        Eigen::Vector3d hp0;
+
+        Eigen::Vector3d dhp0;
+        Eigen::Vector4d Hdhp0, THdhp0;
+        Eigen::Vector2d piTHdhp0;
     };
 
   }
