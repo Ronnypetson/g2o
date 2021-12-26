@@ -44,7 +44,11 @@ using namespace std;
 using namespace g2o;
 using namespace g2o::tutorial;
 
-void write_output(string filename, vector<VertexEpipolarSE3*>& vertices, vector<EdgeEpipolarSE3*>& edges){
+
+void write_output(
+  string filename,
+  vector<VertexEpipolarSE3*>& vertices,
+  vector<EdgeEpipolarSE3*>& edges){
   // write output
   ofstream fileOutputStream;
   cerr << "Writing into " << filename << endl; // "epipolar_SE3.g2o"
@@ -71,6 +75,33 @@ void write_output(string filename, vector<VertexEpipolarSE3*>& vertices, vector<
     fout << endl;
   }
 }
+
+
+void save_scene(
+  string pose_filename,
+  string landmark_filename,
+  vector<VertexEpipolarSE3*>& vertices,
+  vector<Eigen::Vector3d>& landmarks){
+
+  ofstream fileOutputStream;
+  fileOutputStream.open(pose_filename);
+  ostream& fout = fileOutputStream;
+  for (size_t i = 0; i < vertices.size(); ++i) {
+    VertexEpipolarSE3* v = vertices[i];
+    fout << v->estimate().toMatrix() << "\n\n";
+  }
+
+  ofstream lm_fileOutputStream;
+  lm_fileOutputStream.open(landmark_filename);
+  ostream& lm_fout = lm_fileOutputStream;
+  for (size_t i = 0; i < landmarks.size(); ++i) {
+    lm_fout << landmarks[i](0) << " "
+            << landmarks[i](1) << " "
+            << landmarks[i](2) << " "
+            << 1.0 << "\n";
+  }
+}
+
 
 int main()
 {
@@ -136,6 +167,12 @@ int main()
   }
   cerr << "done." << endl;
 
+  vector<Eigen::Vector3d> landmarks;
+  for (size_t i = 0; i < simulator.landmarks().size(); ++i){
+    const Simulator::Landmark l = simulator.landmarks()[i];
+    landmarks.push_back(l.truePose);
+  }
+
   /*********************************************************************************
    * optimization
    ********************************************************************************/
@@ -151,9 +188,11 @@ int main()
 
   cerr << "Optimizing" << endl;
   write_output("before_epipolar_SE3.g2o", vertices, edges);
+  save_scene("poses_SE3.T", "landmarks_R3.lm", vertices, landmarks);
   optimizer.initializeOptimization();
   optimizer.optimize(5);
   write_output("after_epipolar_SE3.g2o", vertices, edges);
+  save_scene("opt_poses_SE3.T", "opt_landmarks_R3.lm", vertices, landmarks);
   cerr << "done." << endl;
 
   optimizer.save("tutorial_after.g2o");
