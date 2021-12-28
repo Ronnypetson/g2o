@@ -108,7 +108,7 @@ int main()
   // TODO simulate different sensor offset
   // simulate a robot observing landmarks while travelling on a grid
   SE3 sensorOffsetTransf(0.0, 0.0, 0.0, -0.0, -0.0, -0.0);
-  int numNodes = 5;
+  int numNodes = 20;
   Simulator simulator;
   simulator.simulate(numNodes, sensorOffsetTransf);
 
@@ -137,18 +137,25 @@ int main()
   // adding the odometry to the optimizer
   // first adding all the vertices
   vector<VertexEpipolarSE3*> vertices;
+  vector<VertexEpipolarSE3*> trueVertices;
   vector<EdgeEpipolarSE3*> edges;
   cerr << "Optimization: Adding robot poses ... ";
   for (size_t i = 0; i < simulator.poses().size(); ++i) {
     const Simulator::GridPose& p = simulator.poses()[i];
     const SE3& t = p.simulatorPose;
     VertexEpipolarSE3* robot =  new VertexEpipolarSE3;
+    VertexEpipolarSE3* trueRobot =  new VertexEpipolarSE3;
+    // Set estimate robot pose
     robot->setId(p.id);
     robot->setEstimate(t);
+    // Set true robot pose
+    trueRobot->setId(p.id);
+    trueRobot->setEstimate(p.truePose);
     if (i == 0)
       robot->setFixed(true);
     optimizer.addVertex(robot);
     vertices.push_back(robot);
+    trueVertices.push_back(trueRobot);
   }
   // optimizer.activeVertices()[0]->setFixed(true);
   cerr << "done." << endl;
@@ -189,6 +196,7 @@ int main()
   cerr << "Optimizing" << endl;
   write_output("before_epipolar_SE3.g2o", vertices, edges);
   save_scene("poses_SE3.T", "landmarks_R3.lm", vertices, landmarks);
+  save_scene("true_poses_SE3.T", "landmarks_R3.lm", trueVertices, landmarks);
   optimizer.initializeOptimization();
   optimizer.optimize(5);
   write_output("after_epipolar_SE3.g2o", vertices, edges);

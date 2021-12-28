@@ -28,6 +28,8 @@ def main():
     T = np.reshape(T, (-1, 4, 4))
     T_opt = np.fromfile('opt_poses_SE3.T', sep=' ')
     T_opt = np.reshape(T_opt, (-1, 4, 4))
+    T_true = np.fromfile('true_poses_SE3.T', sep=' ')
+    T_true = np.reshape(T_true, (-1, 4, 4))
 
     T_opt_norm = np.copy(T_opt)
     norm_pose = np.linalg.inv(T[0]) @ T[1]
@@ -57,7 +59,7 @@ def main():
 
         # Draw Point Cloud Nx3
         gl.glPointSize(3)
-        gl.glColor3f(0.0, 0.0, 1.0)
+        gl.glColor3f(1.0, 0.0, 0.0)
         pangolin.DrawPoints(X[:, :3])
 
         # Draw camera
@@ -65,17 +67,22 @@ def main():
         gl.glColor3f(0.0, 1.0, 0.0)
         for pose in T:
             pangolin.DrawCamera(pose, 0.5/2, 0.75/2, 0.8/2)
-        pangolin.DrawLine(T[:i + 1, :3, 3])
+        pangolin.DrawLine(T[:, :3, 3])
 
-        gl.glColor3f(1.0, 0.0, 0.0)
-        for pose in T_opt:
+        # gl.glColor3f(1.0, 0.0, 0.0)
+        # for pose in T_opt:
+        #     pangolin.DrawCamera(pose, 0.5/2, 0.75/2, 0.8/2)
+        # pangolin.DrawLine(T_opt[:i + 1, :3, 3])
+
+        gl.glColor3f(0.0, 0.0, 1.0)
+        for pose in T_true:
             pangolin.DrawCamera(pose, 0.5/2, 0.75/2, 0.8/2)
-        pangolin.DrawLine(T_opt[:i + 1, :3, 3])
+        pangolin.DrawLine(T_true[:, :3, 3])
 
         gl.glColor3f(1.0, 0.0, 1.0)
         for pose in T_opt_norm:
             pangolin.DrawCamera(pose, 0.5/2, 0.75/2, 0.8/2)
-        pangolin.DrawLine(T_opt_norm[:i + 1, :3, 3])
+        pangolin.DrawLine(T_opt_norm[:, :3, 3])
 
         i = min(i + 1, len(T) - 1)
 

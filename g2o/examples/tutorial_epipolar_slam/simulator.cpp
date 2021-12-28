@@ -75,9 +75,9 @@ namespace g2o {
       // Vector3d rotNoise(0.0, 0.0, 0.0);
       // Vector4d landmarkNoise(0.0, 0.0, 0.0, 0.0);
 
-      Vector3d transNoise(0.01, 0.01, 0.01);
+      Vector3d transNoise(0.1, 0.1, 0.1);
       Vector3d rotNoise(0.01, 0.01, 0.01);
-      Vector4d landmarkNoise(0.0, 0.0, 0.0, 0.0);
+      Vector4d landmarkNoise(0.001, 0.001, 0.001, 0.001);
 
       Vector2d bound(boundArea, boundArea);
 
@@ -250,6 +250,7 @@ namespace g2o {
           for (size_t j = 0; j < p.landmarks.size(); ++j) {
             Landmark* l = p.landmarks[j];
 
+            size_t num_pair_points = 0;
             for (size_t k = 0; k < l->seenBy.size(); ++k) {
               int _poseIndex = globalId2PoseIndex[l->seenBy[k]];
               const GridPose& p_tgt = poses[_poseIndex];
@@ -282,6 +283,11 @@ namespace g2o {
               le.trueMeas = trueObservation4d;
               le.simulatorMeas = observation4d;
               le.information = information;
+
+              num_pair_points += 1;
+              if(num_pair_points > 15){
+                break;
+              }
             }
 
           }
