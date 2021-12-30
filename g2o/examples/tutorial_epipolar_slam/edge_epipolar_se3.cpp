@@ -37,6 +37,35 @@ namespace g2o {
     {
     }
 
+// #ifndef NUMERIC_JACOBIAN_TWO_D_TYPES
+    // void EdgeEpipolarSE3::linearizeOplus()
+    // {
+    //   const VertexEpipolarSE3* vi     = static_cast<const VertexEpipolarSE3*>(_vertices[0]);
+    //   const VertexEpipolarSE3* vj     = static_cast<const VertexEpipolarSE3*>(_vertices[1]);
+    //   const number_t& x1        = vi->estimate().translation()[0];
+    //   const number_t& y1        = vi->estimate().translation()[1];
+    //   const number_t& th1       = vi->estimate().rotation().angle();
+    //   const number_t& x2        = vj->estimate()[0];
+    //   const number_t& y2        = vj->estimate()[1];
+
+    //   number_t aux_1 = std::cos(th1) ;
+    //   number_t aux_2 = -aux_1 ;
+    //   number_t aux_3 = std::sin(th1) ;
+
+    //   _jacobianOplusXi( 0 , 0 ) = aux_2 ;
+    //   _jacobianOplusXi( 0 , 1 ) = -aux_3 ;
+    //   _jacobianOplusXi( 0 , 2 ) = aux_1*y2-aux_1*y1-aux_3*x2+aux_3*x1 ;
+    //   _jacobianOplusXi( 1 , 0 ) = aux_3 ;
+    //   _jacobianOplusXi( 1 , 1 ) = aux_2 ;
+    //   _jacobianOplusXi( 1 , 2 ) = -aux_3*y2+aux_3*y1-aux_1*x2+aux_1*x1 ;
+
+    //   _jacobianOplusXj( 0 , 0 ) = aux_1 ;
+    //   _jacobianOplusXj( 0 , 1 ) = aux_3 ;
+    //   _jacobianOplusXj( 1 , 0 ) = -aux_3 ;
+    //   _jacobianOplusXj( 1 , 1 ) = aux_1 ;
+    // }
+// #endif
+
     bool EdgeEpipolarSE3::read(std::istream& is)
     {
       Eigen::Vector4d p;

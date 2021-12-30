@@ -49,34 +49,32 @@ namespace g2o {
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         EdgeEpipolarSE3();
 
-        Eigen::Matrix4d _pose_inverse(Eigen::Matrix4d& pose){
-          Eigen::Matrix4d _inv = Eigen::Matrix4d::Zero();
-          _inv(3, 3) = 1.0;
-          Eigen::Matrix3d R = pose.block<3, 3>(0, 0);
-          Eigen::Vector3d t = pose.block<3, 1>(0, 3);
-          _inv.block<3, 3>(0, 0) = R.transpose();
-          _inv.block<3, 1>(0, 3) = -R.transpose() * t;
-          return _inv;
-        }
-
         void computeError()
         {
           const VertexEpipolarSE3* v0 = static_cast<const VertexEpipolarSE3*>(_vertices[0]);
           const VertexEpipolarSE3* v1 = static_cast<const VertexEpipolarSE3*>(_vertices[1]);
 
-          p0 << _measurement.block<2, 1>(0, 0);
-          p1 << _measurement.block<2, 1>(2, 0);
-
           v0_matrix = v0->estimate().toMatrix();
           v1_matrix = v1->estimate().toMatrix();
 
-          // Eigen::Matrix4d pose_0wrt1 = (v1->estimate().inverse() * v0->estimate()).toMatrix();
-          // Eigen::Matrix4d pose_1wrt0 = pose_0wrt1.inverse();
+          // std::pair<int, int> visit_key(v0->id(), v1->id());
+          // if(_visit_counts.find(visit_key) == _visit_counts.end()){
+          //   _visit_counts[visit_key] = 0;
+          // } else {
+          //   _visit_counts[visit_key] += 1;
+          //   for(std::map<std::pair<int, int>, int>::iterator it = _visit_counts.begin(); it != _visit_counts.end(); it++){
+          //     std::cout << it->first.first << " " << it->first.second << ": " << it->second << "\n";
+          //   }
+          // }
+
           pose_0wrt1 = _pose_inverse(v1_matrix) * v0_matrix;
           pose_1wrt0 = _pose_inverse(pose_0wrt1);
 
           R = pose_1wrt0.block<3, 3>(0, 0).transpose();
           t = pose_1wrt0.block<3, 1>(0, 3);
+
+          p0 << _measurement.block<2, 1>(0, 0);
+          p1 << _measurement.block<2, 1>(2, 0);
 
           _p1 << 1.0, 0.0, -p1(0),
                  0.0, 1.0, -p1(1);
@@ -93,7 +91,12 @@ namespace g2o {
           // Reproject and compute residual
           THdhp0 = pose_0wrt1 * Hdhp0;
           piTHdhp0 = THdhp0.block<2, 1>(0, 0) / THdhp0(2);
-          _error = piTHdhp0 - p1;
+          diff = piTHdhp0 - p1;
+          if (diff.norm() > 3.0)
+            diff = diff.cwiseProduct(diff);
+          else
+            diff = diff.cwiseAbs();
+          _error = diff;
         }
 
         void setMeasurement(const Eigen::Vector4d& m){
@@ -104,10 +107,26 @@ namespace g2o {
           _inverseMeasurement << m(2), m(3), m(0), m(1);
         }
 
+// #ifndef NUMERIC_JACOBIAN_TWO_D_TYPES
+        // virtual void linearizeOplus();
+// #endif
+
         virtual bool read(std::istream& is);
         virtual bool write(std::ostream& os) const;
 
       protected:
+        Eigen::Matrix4d _pose_inverse(Eigen::Matrix4d& pose){
+          Eigen::Matrix4d _inv = Eigen::Matrix4d::Zero();
+          _inv(3, 3) = 1.0;
+          Eigen::Matrix3d R = pose.block<3, 3>(0, 0);
+          Eigen::Vector3d t = pose.block<3, 1>(0, 3);
+          _inv.block<3, 3>(0, 0) = R.transpose();
+          _inv.block<3, 1>(0, 3) = -R.transpose() * t;
+          return _inv;
+        }
+
+        // std::map<std::pair<int, int>, int> _visit_counts;
+
         Eigen::Vector4d _inverseMeasurement;
 
         Eigen::Vector2d p0;
@@ -131,6 +150,7 @@ namespace g2o {
         Eigen::Vector3d dhp0;
         Eigen::Vector4d Hdhp0, THdhp0;
         Eigen::Vector2d piTHdhp0;
+        Eigen::Vector2d diff;
     };
 
   }

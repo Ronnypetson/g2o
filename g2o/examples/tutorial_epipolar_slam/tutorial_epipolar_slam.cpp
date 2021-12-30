@@ -108,7 +108,7 @@ int main()
   // TODO simulate different sensor offset
   // simulate a robot observing landmarks while travelling on a grid
   SE3 sensorOffsetTransf(0.0, 0.0, 0.0, -0.0, -0.0, -0.0);
-  int numNodes = 20;
+  int numNodes = 5;
   Simulator simulator;
   simulator.simulate(numNodes, sensorOffsetTransf);
 
@@ -198,7 +198,7 @@ int main()
   save_scene("poses_SE3.T", "landmarks_R3.lm", vertices, landmarks);
   save_scene("true_poses_SE3.T", "landmarks_R3.lm", trueVertices, landmarks);
   optimizer.initializeOptimization();
-  optimizer.optimize(5);
+  optimizer.optimize(20);
   write_output("after_epipolar_SE3.g2o", vertices, edges);
   save_scene("opt_poses_SE3.T", "opt_landmarks_R3.lm", vertices, landmarks);
   cerr << "done." << endl;

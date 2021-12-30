@@ -93,7 +93,7 @@ namespace g2o {
       landmarks.clear();
       Simulator::GridPose firstPose;
       firstPose.id = 0;
-      firstPose.truePose = SE3(10, 10, 10, 0.0, 0.0, 0.0);
+      firstPose.truePose = SE3(0, 0, 0, 0.0, 0.0, 0.0);
       firstPose.simulatorPose = firstPose.truePose;
       poses.push_back(firstPose);
       cerr << "Simulator: sampling nodes ...";
@@ -255,7 +255,7 @@ namespace g2o {
               int _poseIndex = globalId2PoseIndex[l->seenBy[k]];
               const GridPose& p_tgt = poses[_poseIndex];
 
-              if (p.id == p_tgt.id) {
+              if (p.id >= p_tgt.id) {
                 continue;
               }
 
@@ -285,7 +285,7 @@ namespace g2o {
               le.information = information;
 
               num_pair_points += 1;
-              if(num_pair_points > 15){
+              if(num_pair_points > 30){
                 break;
               }
             }
