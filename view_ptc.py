@@ -32,9 +32,9 @@ def main():
     T_true = np.reshape(T_true, (-1, 4, 4))
 
     T_opt_norm = np.copy(T_opt)
-    norm_pose = np.linalg.inv(T[0]) @ T[1]
+    norm_pose_true = np.linalg.inv(T_true[0]) @ T_true[1]
     norm_pose_opt = np.linalg.inv(T_opt[0]) @ T_opt[1]
-    norm_const = np.linalg.norm(norm_pose[:3, 3]) / np.linalg.norm(norm_pose_opt[:3, 3])
+    norm_const = np.linalg.norm(norm_pose_true[:3, 3]) / np.linalg.norm(norm_pose_opt[:3, 3])
     T_opt_norm[:, :3, 3] = T_opt_norm[:, :3, 3] * norm_const
 
     displacement = np.linalg.inv(T_opt_norm[0]) @ T[0]

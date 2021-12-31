@@ -77,7 +77,7 @@ namespace g2o {
 
       Vector3d transNoise(0.1, 0.1, 0.1);
       Vector3d rotNoise(0.01, 0.01, 0.01);
-      Vector4d landmarkNoise(0.0, 0.0, 0.0, 0.0);
+      Vector4d landmarkNoise(0.01, 0.01, 0.01, 0.01);
 
       Vector2d bound(boundArea, boundArea);
 
@@ -153,7 +153,7 @@ namespace g2o {
                 do {
                   offx = Sampler::uniformRand(-5 * stepLen, 5 * stepLen);
                   offy = Sampler::uniformRand(-5 * stepLen, 5 * stepLen);
-                  offz = Sampler::uniformRand(5 * stepLen, 10 * stepLen);
+                  offz = Sampler::uniformRand(-10 * stepLen, 10 * stepLen);
                 } while (hypot_sqr(offx, offy) < 0.25 * 0.25);
                 l->truePose[0] = cx + offx;
                 l->truePose[1] = cy + offy;
@@ -268,7 +268,7 @@ namespace g2o {
                 }
               }
 
-              if (p.id >= p_tgt.id) {
+              if (p.id == p_tgt.id) {
                 continue;
               }
 
@@ -309,10 +309,10 @@ namespace g2o {
         cerr << "done." << endl;
       }
 
-      std::map<std::pair<int, int>, int>::iterator it;
-      for(it = edge_counter.begin(); it != edge_counter.end(); it++){
-        std::cout << it->first.first << " " << it->first.second << ": " << it->second << "\n";
-      }
+      // std::map<std::pair<int, int>, int>::iterator it;
+      // for(it = edge_counter.begin(); it != edge_counter.end(); it++){
+      //   std::cout << it->first.first << " " << it->first.second << ": " << it->second << "\n";
+      // }
 
       // cleaning up
       for (LandmarkGrid::iterator it = grid.begin(); it != grid.end(); ++it) {
