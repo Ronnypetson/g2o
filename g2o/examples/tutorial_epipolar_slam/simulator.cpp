@@ -77,7 +77,7 @@ namespace g2o {
 
       Vector3d transNoise(0.1, 0.1, 0.1);
       Vector3d rotNoise(0.01, 0.01, 0.01);
-      Vector4d landmarkNoise(0.001, 0.001, 0.001, 0.001);
+      Vector4d landmarkNoise(0.0, 0.0, 0.0, 0.0);
 
       Vector2d bound(boundArea, boundArea);
 
@@ -220,6 +220,8 @@ namespace g2o {
 
       _landmarks.clear();
       _landmarkObservations.clear();
+      int MAX_LANDMARKS_PER_EDGE = 15;
+      std::map<std::pair<int, int>, int> edge_counter;
       // add the landmark observations
       {
         cerr << "Simulator: add landmark observations ... ";
@@ -254,10 +256,17 @@ namespace g2o {
           for (size_t j = 0; j < p.landmarks.size(); ++j) {
             Landmark* l = p.landmarks[j];
 
-            size_t num_pair_points = 0;
             for (size_t k = 0; k < l->seenBy.size(); ++k) {
               int _poseIndex = globalId2PoseIndex[l->seenBy[k]];
               const GridPose& p_tgt = poses[_poseIndex];
+
+              std::pair<int, int> edge_key(p.id, p_tgt.id);
+              bool edge_counted = (edge_counter.find(edge_key) != edge_counter.end());
+              if( edge_counted ) {
+                if( edge_counter[edge_key] >= MAX_LANDMARKS_PER_EDGE ) {
+                  break;
+                }
+              }
 
               if (p.id >= p_tgt.id) {
                 continue;
@@ -288,15 +297,21 @@ namespace g2o {
               le.simulatorMeas = observation4d;
               le.information = information;
 
-              num_pair_points += 1;
-              if(num_pair_points > 30){
-                break;
+              if(edge_counter.find(edge_key) == edge_counter.end()){
+                edge_counter[edge_key] = 1;
+              } else {
+                edge_counter[edge_key] += 1;
               }
             }
 
           }
         }
         cerr << "done." << endl;
+      }
+
+      std::map<std::pair<int, int>, int>::iterator it;
+      for(it = edge_counter.begin(); it != edge_counter.end(); it++){
+        std::cout << it->first.first << " " << it->first.second << ": " << it->second << "\n";
       }
 
       // cleaning up
