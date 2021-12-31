@@ -38,6 +38,7 @@
 #include "g2o/core/factory.h"
 #include "g2o/core/optimization_algorithm_factory.h"
 #include "g2o/core/optimization_algorithm_gauss_newton.h"
+#include "g2o/core/optimization_algorithm_levenberg.h"
 #include "g2o/solvers/eigen/linear_solver_eigen.h"
 
 using namespace std;
@@ -108,7 +109,7 @@ int main()
   // TODO simulate different sensor offset
   // simulate a robot observing landmarks while travelling on a grid
   SE3 sensorOffsetTransf(0.0, 0.0, 0.0, -0.0, -0.0, -0.0);
-  int numNodes = 5;
+  int numNodes = 10;
   Simulator simulator;
   simulator.simulate(numNodes, sensorOffsetTransf);
 
@@ -123,7 +124,9 @@ int main()
   SparseOptimizer optimizer;
   auto linearSolver = g2o::make_unique<SlamLinearSolver>();
   linearSolver->setBlockOrdering(false);
-  OptimizationAlgorithmGaussNewton* solver = new OptimizationAlgorithmGaussNewton(
+  // OptimizationAlgorithmGaussNewton* solver = new OptimizationAlgorithmGaussNewton(
+  //   g2o::make_unique<SlamBlockSolver>(std::move(linearSolver)));
+  OptimizationAlgorithmLevenberg* solver = new OptimizationAlgorithmLevenberg(
     g2o::make_unique<SlamBlockSolver>(std::move(linearSolver)));
 
   optimizer.setAlgorithm(solver);
@@ -151,8 +154,8 @@ int main()
     // Set true robot pose
     trueRobot->setId(p.id);
     trueRobot->setEstimate(p.truePose);
-    if (i == 0)
-      robot->setFixed(true);
+    // if (i == 0)
+    //   robot->setFixed(true);
     optimizer.addVertex(robot);
     vertices.push_back(robot);
     trueVertices.push_back(trueRobot);
@@ -198,7 +201,7 @@ int main()
   save_scene("poses_SE3.T", "landmarks_R3.lm", vertices, landmarks);
   save_scene("true_poses_SE3.T", "landmarks_R3.lm", trueVertices, landmarks);
   optimizer.initializeOptimization();
-  optimizer.optimize(20);
+  optimizer.optimize(5);
   write_output("after_epipolar_SE3.g2o", vertices, edges);
   save_scene("opt_poses_SE3.T", "opt_landmarks_R3.lm", vertices, landmarks);
   cerr << "done." << endl;

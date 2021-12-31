@@ -223,12 +223,16 @@ namespace g2o {
       // add the landmark observations
       {
         cerr << "Simulator: add landmark observations ... ";
-        Matrix2d covariance; covariance.fill(0.);
-        // covariance(0, 0) = landmarkNoise[0] * landmarkNoise[0] + landmarkNoise[2] * landmarkNoise[2];
-        // covariance(1, 1) = landmarkNoise[1] * landmarkNoise[1] + landmarkNoise[3] * landmarkNoise[3];
-        covariance(0, 0) = 1.0;
-        covariance(1, 1) = 1.0;
-        Matrix2d information = covariance.inverse();
+        // Matrix2d covariance; covariance.fill(0.);
+        // // covariance(0, 0) = landmarkNoise[0] * landmarkNoise[0] + landmarkNoise[2] * landmarkNoise[2];
+        // // covariance(1, 1) = landmarkNoise[1] * landmarkNoise[1] + landmarkNoise[3] * landmarkNoise[3];
+        // covariance(0, 0) = 1.0;
+        // covariance(1, 1) = 1.0;
+        // Matrix2d information = covariance.inverse();
+
+        Eigen::Matrix<double, 1, 1> covariance;
+        covariance.fill(1.0);
+        Eigen::Matrix<double, 1, 1> information = covariance.inverse();
 
         for (size_t i = 0; i < poses.size(); ++i) {
           const GridPose& p = poses[i];
