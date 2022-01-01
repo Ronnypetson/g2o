@@ -77,7 +77,7 @@ namespace g2o {
 
       Vector3d transNoise(0.1, 0.1, 0.1);
       Vector3d rotNoise(0.01, 0.01, 0.01);
-      Vector4d landmarkNoise(0.01, 0.01, 0.01, 0.01);
+      Vector4d landmarkNoise(0.0, 0.0, 0.0, 0.0);
 
       Vector2d bound(boundArea, boundArea);
 
@@ -268,7 +268,7 @@ namespace g2o {
                 }
               }
 
-              if (p.id == p_tgt.id) {
+              if (p.id >= p_tgt.id) {
                 continue;
               }
 

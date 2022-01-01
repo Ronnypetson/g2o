@@ -49,8 +49,7 @@ namespace g2o {
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         EdgeEpipolarSE3();
 
-        void computeError()
-        {
+        void computeDiff(){
           const VertexEpipolarSE3* v0 = static_cast<const VertexEpipolarSE3*>(_vertices[0]);
           const VertexEpipolarSE3* v1 = static_cast<const VertexEpipolarSE3*>(_vertices[1]);
 
@@ -59,9 +58,6 @@ namespace g2o {
 
           pose_0wrt1 = _pose_inverse(v1_matrix) * v0_matrix;
           pose_1wrt0 = _pose_inverse(pose_0wrt1);
-
-          // R = pose_1wrt0.block<3, 3>(0, 0).transpose();
-          // t = pose_1wrt0.block<3, 1>(0, 3);
 
           R = pose_0wrt1.block<3, 3>(0, 0);
           t = pose_0wrt1.block<3, 1>(0, 3);
@@ -73,8 +69,6 @@ namespace g2o {
                  0.0, 1.0, -p1(1);
 
           hp0 << p0(0), p0(1), 1.0;
-          // A = _p1 * R * t;
-          // B = _p1 * R * hp0;
           A = _p1 * t;
           B = _p1 * R * hp0;
           d = A.norm() / B.norm();
@@ -87,10 +81,11 @@ namespace g2o {
           THdhp0 = pose_0wrt1 * Hdhp0;
           piTHdhp0 = THdhp0.block<2, 1>(0, 0) / THdhp0(2);
           diff = piTHdhp0 - p1;
-          // if (diff.norm() > 100.0)
-          //   diff = diff.cwiseProduct(diff);
-          // else
-          //   diff = diff.cwiseAbs();
+        }
+
+        void computeError()
+        {
+          computeDiff();
           diff = diff.cwiseAbs();
           _error << diff.sum();
         }
@@ -103,9 +98,9 @@ namespace g2o {
           _inverseMeasurement << m(2), m(3), m(0), m(1);
         }
 
-// #ifndef NUMERIC_JACOBIAN_THREE_D_TYPES
-//         virtual void linearizeOplus();
-// #endif
+#ifndef NUMERIC_JACOBIAN_THREE_D_TYPES
+        virtual void linearizeOplus();
+#endif
 
         virtual bool read(std::istream& is);
         virtual bool write(std::ostream& os) const;
@@ -145,6 +140,7 @@ namespace g2o {
         Eigen::Vector4d Hdhp0, THdhp0;
         Eigen::Vector2d piTHdhp0;
         Eigen::Vector2d diff;
+        Eigen::Vector2d sign;
     };
 
   }

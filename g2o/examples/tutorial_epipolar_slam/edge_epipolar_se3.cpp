@@ -24,6 +24,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <bits/stdc++.h>
 #include "edge_epipolar_se3.h"
 #include "g2o/core/eigen_types.h"
 
@@ -37,20 +38,75 @@ namespace g2o {
     {
     }
 
-// #ifndef NUMERIC_JACOBIAN_THREE_D_TYPES
-//     void EdgeEpipolarSE3::linearizeOplus()
-//     {
-//       const VertexEpipolarSE3* vi     = static_cast<const VertexEpipolarSE3*>(_vertices[0]);
-//       const VertexEpipolarSE3* vj     = static_cast<const VertexEpipolarSE3*>(_vertices[1]);
-//       // const number_t& x1        = vi->estimate().translation()[0];
-//       // const number_t& y1        = vi->estimate().translation()[1];
-//       // const number_t& th1       = vi->estimate().rotation().angle();
-//       // const number_t& x2        = vj->estimate()[0];
-//       // const number_t& y2        = vj->estimate()[1];
+#ifndef NUMERIC_JACOBIAN_THREE_D_TYPES
+    void EdgeEpipolarSE3::linearizeOplus()
+    {
+      computeDiff();
+      int POSE_DIM = 6;
+      sign = diff.array().sign();
 
-//       _jacobianOplusXi( 0 , 0 ) = 0.0;
-//     }
-// #endif
+      Eigen::Matrix3d dPIdX;
+      dPIdX << 1.0, 0.0, - THdhp0(0) / THdhp0(2),
+               0.0, 1.0, - THdhp0(1) / THdhp0(2),
+               0.0, 0.0, 0.0;
+      dPIdX = (1.0 / THdhp0(2)) * dPIdX.eval();
+
+      Eigen::Vector4d dLandmark_dXii;
+      Eigen::Matrix4d _dExpXi_dXii;
+      Eigen::Matrix<double, 3, 4> selector;
+      Eigen::Vector4d tselector;
+      selector << 1, 0, 0, 0,
+                  0, 1, 0, 0,
+                  0, 0, 1, 0;
+      tselector << 0, 0, 0, 1;
+      Eigen::Vector2d dA_dXii;
+      Eigen::Vector2d dB_dXii;
+      double ATA, BTB;
+      double dd_dXii;
+      Eigen::Vector4d Shp0;
+      ATA = A.norm();
+      BTB = B.norm();
+      Shp0.block<3, 1>(0, 0) = hp0;
+      Shp0(3) = 0.0;
+      double dr_dXii;
+      Eigen::Vector3d dPI_dXii;
+      // Jacobians w.r.t v1 (vj)
+      for (int i = 0; i < POSE_DIM; i++){
+        _dExpXi_dXii = -Sophus::SE3<double>::Dxi_exp_x_matrix_at_0(i);
+
+        dA_dXii = _p1 * selector * _dExpXi_dXii * pose_0wrt1 * tselector;
+        dB_dXii = _p1 * selector * _dExpXi_dXii * pose_0wrt1 * selector.transpose() * hp0;
+
+        dd_dXii = std::pow(BTB, -0.5) * std::pow(ATA, -0.5) * A.dot(dA_dXii)
+                  - std::pow(ATA, 0.5) * std::pow(BTB, -1.5) * B.dot(dB_dXii);
+
+        dLandmark_dXii = _dExpXi_dXii * pose_0wrt1 * Hdhp0 + pose_0wrt1 * dd_dXii * Shp0;
+
+        dPI_dXii = dPIdX * dLandmark_dXii.block<3, 1>(0, 0);
+        // dr_dXii = sign.dot(dPI_dXii.block<2, 1>(0, 0));
+        dr_dXii = sign.transpose() * dPI_dXii.block<2, 1>(0, 0);
+        _jacobianOplusXj(0, i) = dr_dXii;
+      }
+
+      // Jacobians w.r.t v0 (vi)
+      for (int i = 0; i < POSE_DIM; i++){
+        _dExpXi_dXii = Sophus::SE3<double>::Dxi_exp_x_matrix_at_0(i);
+
+        dA_dXii = _p1 * selector * pose_0wrt1 * _dExpXi_dXii * tselector;
+        dB_dXii = _p1 * selector * pose_0wrt1 * _dExpXi_dXii * selector.transpose() * hp0;
+
+        dd_dXii = std::pow(BTB, -0.5) * std::pow(ATA, -0.5) * A.dot(dA_dXii)
+                  - std::pow(ATA, 0.5) * std::pow(BTB, -1.5) * B.dot(dB_dXii);
+
+        dLandmark_dXii = pose_0wrt1 * _dExpXi_dXii * Hdhp0 + pose_0wrt1 * dd_dXii * Shp0;
+
+        dPI_dXii = dPIdX * dLandmark_dXii.block<3, 1>(0, 0);
+        // dr_dXii = sign.dot(dPI_dXii.block<2, 1>(0, 0));
+        dr_dXii = sign.transpose() * dPI_dXii.block<2, 1>(0, 0);
+        _jacobianOplusXi(0, i) = dr_dXii;
+      }
+    }
+#endif
 
     bool EdgeEpipolarSE3::read(std::istream& is)
     {
