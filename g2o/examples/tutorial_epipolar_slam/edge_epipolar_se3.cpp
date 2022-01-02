@@ -43,7 +43,7 @@ namespace g2o {
     {
       computeDiff();
       int POSE_DIM = 6;
-      sign = diff.array().sign();
+      sign = diff.unaryExpr(std::ptr_fun(_sign_func));
 
       Eigen::Matrix3d dPIdX;
       dPIdX << 1.0, 0.0, - THdhp0(0) / THdhp0(2),
@@ -64,46 +64,69 @@ namespace g2o {
       double ATA, BTB;
       double dd_dXii;
       Eigen::Vector4d Shp0;
-      ATA = A.norm();
-      BTB = B.norm();
+      ATA = A.norm() * A.norm();
+      BTB = B.norm() * B.norm();
       Shp0.block<3, 1>(0, 0) = hp0;
       Shp0(3) = 0.0;
       double dr_dXii;
       Eigen::Vector3d dPI_dXii;
+
+      VertexEpipolarSE3* vertex_0 = static_cast<VertexEpipolarSE3*>(_vertices[0]);
+      VertexEpipolarSE3* vertex_1 = static_cast<VertexEpipolarSE3*>(_vertices[1]);
+
+      // Eigen::Matrix<double, 6, 1> numJacs0 = linearizeOplusAux(vertex_0);
+      // Eigen::Matrix<double, 6, 1> numJacs1 = linearizeOplusAux(vertex_1);
+
       // Jacobians w.r.t v1 (vj)
-      for (int i = 0; i < POSE_DIM; i++){
-        _dExpXi_dXii = -Sophus::SE3<double>::Dxi_exp_x_matrix_at_0(i);
+      if (!vertex_1->fixed()){
+        for (int i = 0; i < POSE_DIM; i++){
+          _dExpXi_dXii = -Sophus::SE3<double>::Dxi_exp_x_matrix_at_0(i);
 
-        dA_dXii = _p1 * selector * _dExpXi_dXii * pose_0wrt1 * tselector;
-        dB_dXii = _p1 * selector * _dExpXi_dXii * pose_0wrt1 * selector.transpose() * hp0;
+          dA_dXii = _p1 * selector * _dExpXi_dXii * pose_0wrt1 * tselector;
+          dB_dXii = _p1 * selector * _dExpXi_dXii * pose_0wrt1 * selector.transpose() * hp0;
 
-        dd_dXii = std::pow(BTB, -0.5) * std::pow(ATA, -0.5) * A.dot(dA_dXii)
-                  - std::pow(ATA, 0.5) * std::pow(BTB, -1.5) * B.dot(dB_dXii);
+          dd_dXii = std::pow(BTB, -0.5) * std::pow(ATA, -0.5) * A.dot(dA_dXii)
+                    - std::pow(ATA, 0.5) * std::pow(BTB, -1.5) * B.dot(dB_dXii);
 
-        dLandmark_dXii = _dExpXi_dXii * pose_0wrt1 * Hdhp0 + pose_0wrt1 * dd_dXii * Shp0;
+          dLandmark_dXii = _dExpXi_dXii * pose_0wrt1 * Hdhp0 + pose_0wrt1 * dd_dXii * Shp0;
 
-        dPI_dXii = dPIdX * dLandmark_dXii.block<3, 1>(0, 0);
-        // dr_dXii = sign.dot(dPI_dXii.block<2, 1>(0, 0));
-        dr_dXii = sign.transpose() * dPI_dXii.block<2, 1>(0, 0);
-        _jacobianOplusXj(0, i) = dr_dXii;
+          dPI_dXii = dPIdX * dLandmark_dXii.block<3, 1>(0, 0);
+          // dr_dXii = sign.dot(dPI_dXii.block<2, 1>(0, 0));
+          dr_dXii = sign.transpose() * dPI_dXii.block<2, 1>(0, 0);
+          _jacobianOplusXj(0, i) = dr_dXii; // numJacs1(i, 0);
+          // std::cout << dr_dXii << "\t\t" << numJacs1(i, 0) << "\n";
+        }
+        // std::cout << "1\n\n";
+      } else {
+        for (int i = 0; i < POSE_DIM; i++){
+          _jacobianOplusXj(0, i) = 1E-10;
+        }
       }
 
       // Jacobians w.r.t v0 (vi)
-      for (int i = 0; i < POSE_DIM; i++){
-        _dExpXi_dXii = Sophus::SE3<double>::Dxi_exp_x_matrix_at_0(i);
+      if (!vertex_0->fixed()){
+        for (int i = 0; i < POSE_DIM; i++){
+          _dExpXi_dXii = Sophus::SE3<double>::Dxi_exp_x_matrix_at_0(i);
 
-        dA_dXii = _p1 * selector * pose_0wrt1 * _dExpXi_dXii * tselector;
-        dB_dXii = _p1 * selector * pose_0wrt1 * _dExpXi_dXii * selector.transpose() * hp0;
+          dA_dXii = _p1 * selector * pose_0wrt1 * _dExpXi_dXii * tselector;
+          dB_dXii = _p1 * selector * pose_0wrt1 * _dExpXi_dXii * selector.transpose() * hp0;
 
-        dd_dXii = std::pow(BTB, -0.5) * std::pow(ATA, -0.5) * A.dot(dA_dXii)
-                  - std::pow(ATA, 0.5) * std::pow(BTB, -1.5) * B.dot(dB_dXii);
+          dd_dXii = std::pow(BTB, -0.5) * std::pow(ATA, -0.5) * A.dot(dA_dXii)
+                    - std::pow(ATA, 0.5) * std::pow(BTB, -1.5) * B.dot(dB_dXii);
 
-        dLandmark_dXii = pose_0wrt1 * _dExpXi_dXii * Hdhp0 + pose_0wrt1 * dd_dXii * Shp0;
+          dLandmark_dXii = pose_0wrt1 * _dExpXi_dXii * Hdhp0 + pose_0wrt1 * dd_dXii * Shp0;
 
-        dPI_dXii = dPIdX * dLandmark_dXii.block<3, 1>(0, 0);
-        // dr_dXii = sign.dot(dPI_dXii.block<2, 1>(0, 0));
-        dr_dXii = sign.transpose() * dPI_dXii.block<2, 1>(0, 0);
-        _jacobianOplusXi(0, i) = dr_dXii;
+          dPI_dXii = dPIdX * dLandmark_dXii.block<3, 1>(0, 0);
+          // dr_dXii = sign.dot(dPI_dXii.block<2, 1>(0, 0));
+          dr_dXii = sign.transpose() * dPI_dXii.block<2, 1>(0, 0);
+          _jacobianOplusXi(0, i) = dr_dXii; // numJacs0(i, 0); // 
+          // std::cout << dr_dXii << "\t\t" << numJacs0(i, 0) << "\n";
+        }
+        // std::cout << "0\n\n";
+      } else {
+        for (int i = 0; i < POSE_DIM; i++){
+          _jacobianOplusXi(0, i) = 1E-10;
+        }
       }
     }
 #endif

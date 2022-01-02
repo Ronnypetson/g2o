@@ -27,6 +27,7 @@
 #ifndef G2O_TUTORIAL_EDGE_SE3_H
 #define G2O_TUTORIAL_EDGE_SE3_H
 
+#include <cmath>
 #include "vertex_epipolar_se3.h"
 #include "g2o_tutorial_epipolar_slam_api.h"
 #include "g2o/core/base_binary_edge.h"
@@ -86,8 +87,7 @@ namespace g2o {
         void computeError()
         {
           computeDiff();
-          diff = diff.cwiseAbs();
-          _error << diff.sum();
+          _error << diff.cwiseAbs().sum();
         }
 
         void setMeasurement(const Eigen::Vector4d& m){
@@ -96,6 +96,54 @@ namespace g2o {
           */
           _measurement = m;
           _inverseMeasurement << m(2), m(3), m(0), m(1);
+        }
+
+        static double _sign_func(double x)
+        {
+            if (std::abs(x) > 1E-9){
+              if (x > 0)
+                return +1.0;
+              else
+                return -1.0;
+            } else {
+              if (x > 0)
+                return 1E-9;
+              else
+                return -1E-9;
+            }
+        }
+
+        Eigen::Matrix<double, 6, 1> linearizeOplusAux(VertexEpipolarSE3* vertex) {
+          Eigen::Matrix<double, 6, 1> jacs;
+          jacs.fill(0.0);
+          if (vertex->fixed()) return jacs;
+
+          constexpr number_t delta = cst(1e-9);
+          constexpr number_t scalar = 1 / (2 * delta);
+
+          Eigen::Matrix<double, 6, 1> add_vertex;
+          add_vertex.fill(0.0);
+
+          // estimate the jacobian numerically
+          // add small step along the unit vector in each dimension
+          for (int d = 0; d < 6; ++d) {
+            vertex->push();
+            add_vertex[d] = delta;
+            vertex->oplus(add_vertex.data());
+            computeError();
+            auto errorBak = this->error();
+            vertex->pop();
+            vertex->push();
+            add_vertex[d] = -delta;
+            vertex->oplus(add_vertex.data());
+            computeError();
+            errorBak -= this->error();
+            vertex->pop();
+            add_vertex[d] = 0.0;
+
+            jacs(d, 0) = scalar * errorBak(0, 0);
+          }  // end dimension
+          return jacs;
         }
 
 #ifndef NUMERIC_JACOBIAN_THREE_D_TYPES
