@@ -94,7 +94,7 @@ namespace g2o {
           // dr_dXii = sign.dot(dPI_dXii.block<2, 1>(0, 0));
           dr_dXii = sign.transpose() * dPI_dXii.block<2, 1>(0, 0);
           _jacobianOplusXj(0, i) = dr_dXii; // numJacs1(i, 0);
-          // std::cout << dr_dXii << "\t\t" << numJacs1(i, 0) << "\n";
+          // std::cout << dr_dXii - numJacs1(i, 0) << "\t\t" << dr_dXii << "\t\t" << numJacs1(i, 0) << "\n";
         }
         // std::cout << "1\n\n";
       } else {
@@ -120,7 +120,7 @@ namespace g2o {
           // dr_dXii = sign.dot(dPI_dXii.block<2, 1>(0, 0));
           dr_dXii = sign.transpose() * dPI_dXii.block<2, 1>(0, 0);
           _jacobianOplusXi(0, i) = dr_dXii; // numJacs0(i, 0); // 
-          // std::cout << dr_dXii << "\t\t" << numJacs0(i, 0) << "\n";
+          // std::cout << dr_dXii - numJacs0(i, 0) << "\t\t" << dr_dXii << "\t\t" << numJacs0(i, 0) << "\n";
         }
         // std::cout << "0\n\n";
       } else {
