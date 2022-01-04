@@ -38,13 +38,18 @@
 #include "g2o/core/factory.h"
 #include "g2o/core/optimization_algorithm_factory.h"
 #include "g2o/core/optimization_algorithm_gauss_newton.h"
+#include "g2o/core/optimization_algorithm_levenberg.h"
 #include "g2o/solvers/eigen/linear_solver_eigen.h"
 
 using namespace std;
 using namespace g2o;
 using namespace g2o::tutorial;
 
-void write_output(string filename, vector<VertexEpipolarSE3*>& vertices, vector<EdgeEpipolarSE3*>& edges){
+
+void write_output(
+  string filename,
+  vector<VertexEpipolarSE3*>& vertices,
+  vector<EdgeEpipolarSE3*>& edges){
   // write output
   ofstream fileOutputStream;
   cerr << "Writing into " << filename << endl; // "epipolar_SE3.g2o"
@@ -72,12 +77,39 @@ void write_output(string filename, vector<VertexEpipolarSE3*>& vertices, vector<
   }
 }
 
+
+void save_scene(
+  string pose_filename,
+  string landmark_filename,
+  vector<VertexEpipolarSE3*>& vertices,
+  vector<Eigen::Vector3d>& landmarks){
+
+  ofstream fileOutputStream;
+  fileOutputStream.open(pose_filename);
+  ostream& fout = fileOutputStream;
+  for (size_t i = 0; i < vertices.size(); ++i) {
+    VertexEpipolarSE3* v = vertices[i];
+    fout << v->estimate().toMatrix() << "\n\n";
+  }
+
+  ofstream lm_fileOutputStream;
+  lm_fileOutputStream.open(landmark_filename);
+  ostream& lm_fout = lm_fileOutputStream;
+  for (size_t i = 0; i < landmarks.size(); ++i) {
+    lm_fout << landmarks[i](0) << " "
+            << landmarks[i](1) << " "
+            << landmarks[i](2) << " "
+            << 1.0 << "\n";
+  }
+}
+
+
 int main()
 {
   // TODO simulate different sensor offset
   // simulate a robot observing landmarks while travelling on a grid
   SE3 sensorOffsetTransf(0.0, 0.0, 0.0, -0.0, -0.0, -0.0);
-  int numNodes = 5;
+  int numNodes = 10;
   Simulator simulator;
   simulator.simulate(numNodes, sensorOffsetTransf);
 
@@ -92,7 +124,9 @@ int main()
   SparseOptimizer optimizer;
   auto linearSolver = g2o::make_unique<SlamLinearSolver>();
   linearSolver->setBlockOrdering(false);
-  OptimizationAlgorithmGaussNewton* solver = new OptimizationAlgorithmGaussNewton(
+  // OptimizationAlgorithmGaussNewton* solver = new OptimizationAlgorithmGaussNewton(
+  //   g2o::make_unique<SlamBlockSolver>(std::move(linearSolver)));
+  OptimizationAlgorithmLevenberg* solver = new OptimizationAlgorithmLevenberg(
     g2o::make_unique<SlamBlockSolver>(std::move(linearSolver)));
 
   optimizer.setAlgorithm(solver);
@@ -106,18 +140,25 @@ int main()
   // adding the odometry to the optimizer
   // first adding all the vertices
   vector<VertexEpipolarSE3*> vertices;
+  vector<VertexEpipolarSE3*> trueVertices;
   vector<EdgeEpipolarSE3*> edges;
   cerr << "Optimization: Adding robot poses ... ";
   for (size_t i = 0; i < simulator.poses().size(); ++i) {
     const Simulator::GridPose& p = simulator.poses()[i];
     const SE3& t = p.simulatorPose;
     VertexEpipolarSE3* robot =  new VertexEpipolarSE3;
+    VertexEpipolarSE3* trueRobot =  new VertexEpipolarSE3;
+    // Set estimate robot pose
     robot->setId(p.id);
     robot->setEstimate(t);
-    if (i == 0)
-      robot->setFixed(true);
+    // Set true robot pose
+    trueRobot->setId(p.id);
+    trueRobot->setEstimate(p.truePose);
+    // if (i == 0)
+    //   robot->setFixed(true);
     optimizer.addVertex(robot);
     vertices.push_back(robot);
+    trueVertices.push_back(trueRobot);
   }
   // optimizer.activeVertices()[0]->setFixed(true);
   cerr << "done." << endl;
@@ -136,6 +177,12 @@ int main()
   }
   cerr << "done." << endl;
 
+  vector<Eigen::Vector3d> landmarks;
+  for (size_t i = 0; i < simulator.landmarks().size(); ++i){
+    const Simulator::Landmark l = simulator.landmarks()[i];
+    landmarks.push_back(l.truePose);
+  }
+
   /*********************************************************************************
    * optimization
    ********************************************************************************/
@@ -151,9 +198,12 @@ int main()
 
   cerr << "Optimizing" << endl;
   write_output("before_epipolar_SE3.g2o", vertices, edges);
+  save_scene("poses_SE3.T", "landmarks_R3.lm", vertices, landmarks);
+  save_scene("true_poses_SE3.T", "landmarks_R3.lm", trueVertices, landmarks);
   optimizer.initializeOptimization();
   optimizer.optimize(5);
   write_output("after_epipolar_SE3.g2o", vertices, edges);
+  save_scene("opt_poses_SE3.T", "opt_landmarks_R3.lm", vertices, landmarks);
   cerr << "done." << endl;
 
   optimizer.save("tutorial_after.g2o");

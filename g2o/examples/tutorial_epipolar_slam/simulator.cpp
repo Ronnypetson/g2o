@@ -60,11 +60,11 @@ namespace g2o {
     void Simulator::simulate(int numNodes, const SE3& sensorOffset)
     {
       // simulate a robot observing landmarks while travelling on a grid
-      int steps = 2;
+      int steps = 5;
       double stepLen = 1.0;
       int boundArea = 10;
 
-      double maxSensorRangeLandmarks = 5.0 * stepLen;
+      double maxSensorRangeLandmarks = 10.0 * stepLen;
 
       int landMarksPerSquareMeter = 4;
       double observationProb = 0.8;
@@ -75,9 +75,9 @@ namespace g2o {
       // Vector3d rotNoise(0.0, 0.0, 0.0);
       // Vector4d landmarkNoise(0.0, 0.0, 0.0, 0.0);
 
-      Vector3d transNoise(0.0, 0.0, 0.0);
-      Vector3d rotNoise(0.0, 0.0, 0.0);
-      Vector4d landmarkNoise(0.00001, 0.00001, 0.00001, 0.00001);
+      Vector3d transNoise(0.1, 0.1, 0.1);
+      Vector3d rotNoise(0.01, 0.01, 0.01);
+      Vector4d landmarkNoise(0.0, 0.0, 0.0, 0.0);
 
       Vector2d bound(boundArea, boundArea);
 
@@ -93,14 +93,14 @@ namespace g2o {
       landmarks.clear();
       Simulator::GridPose firstPose;
       firstPose.id = 0;
-      firstPose.truePose = SE3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+      firstPose.truePose = SE3(0, 0, 0, 0.0, 0.0, 0.0);
       firstPose.simulatorPose = firstPose.truePose;
       poses.push_back(firstPose);
       cerr << "Simulator: sampling nodes ...";
       while ((int)poses.size() < numNodes) {
         // add straight motions
         // for (int i = 1; i < steps && (int)poses.size() < numNodes; ++i) {
-        //   Simulator::GridPose nextGridPose = generateNewPose(poses.back(), SE3(stepLen, 0, 0, 0, 0, 0), transNoise, rotNoise);
+        //   Simulator::GridPose nextGridPose = generateNewPose(poses.back(), SE3(0, 0, stepLen, 0, 0, 0), transNoise, rotNoise);
         //   poses.push_back(nextGridPose);
         // }
         // if ((int)poses.size() == numNodes)
@@ -153,7 +153,7 @@ namespace g2o {
                 do {
                   offx = Sampler::uniformRand(-5 * stepLen, 5 * stepLen);
                   offy = Sampler::uniformRand(-5 * stepLen, 5 * stepLen);
-                  offz = Sampler::uniformRand(1 * stepLen, 2 * stepLen);
+                  offz = Sampler::uniformRand(-10 * stepLen, 10 * stepLen);
                 } while (hypot_sqr(offx, offy) < 0.25 * 0.25);
                 l->truePose[0] = cx + offx;
                 l->truePose[1] = cy + offy;
@@ -220,25 +220,31 @@ namespace g2o {
 
       _landmarks.clear();
       _landmarkObservations.clear();
+      int MAX_LANDMARKS_PER_EDGE = 15;
+      std::map<std::pair<int, int>, int> edge_counter;
       // add the landmark observations
       {
         cerr << "Simulator: add landmark observations ... ";
-        Matrix2d covariance; covariance.fill(0.);
-        // covariance(0, 0) = landmarkNoise[0] * landmarkNoise[0] + landmarkNoise[2] * landmarkNoise[2];
-        // covariance(1, 1) = landmarkNoise[1] * landmarkNoise[1] + landmarkNoise[3] * landmarkNoise[3];
-        covariance(0, 0) = 1.0;
-        covariance(1, 1) = 1.0;
-        Matrix2d information = covariance.inverse();
+        // Matrix2d covariance; covariance.fill(0.);
+        // // covariance(0, 0) = landmarkNoise[0] * landmarkNoise[0] + landmarkNoise[2] * landmarkNoise[2];
+        // // covariance(1, 1) = landmarkNoise[1] * landmarkNoise[1] + landmarkNoise[3] * landmarkNoise[3];
+        // covariance(0, 0) = 1.0;
+        // covariance(1, 1) = 1.0;
+        // Matrix2d information = covariance.inverse();
 
-        // for (size_t i = 0; i < poses.size(); ++i) {
-        //   const GridPose& p = poses[i];
-        //   for (size_t j = 0; j < p.landmarks.size(); ++j) {
-        //     Landmark* l = p.landmarks[j];
-        //     if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) {
-        //       landmarks.push_back(*l);
-        //     }
-        //   }
-        // }
+        Eigen::Matrix<double, 1, 1> covariance;
+        covariance.fill(1.0);
+        Eigen::Matrix<double, 1, 1> information = covariance.inverse();
+
+        for (size_t i = 0; i < poses.size(); ++i) {
+          const GridPose& p = poses[i];
+          for (size_t j = 0; j < p.landmarks.size(); ++j) {
+            Landmark* l = p.landmarks[j];
+            if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) {
+              _landmarks.push_back(*l);
+            }
+          }
+        }
 
         /*
         Take a pose poses[i], take poses[i].landmark[j], take poses[i].landmark[j].seenBy[k]
@@ -254,7 +260,15 @@ namespace g2o {
               int _poseIndex = globalId2PoseIndex[l->seenBy[k]];
               const GridPose& p_tgt = poses[_poseIndex];
 
-              if (p.id == p_tgt.id) {
+              std::pair<int, int> edge_key(p.id, p_tgt.id);
+              bool edge_counted = (edge_counter.find(edge_key) != edge_counter.end());
+              if( edge_counted ) {
+                if( edge_counter[edge_key] >= MAX_LANDMARKS_PER_EDGE ) {
+                  break;
+                }
+              }
+
+              if (p.id >= p_tgt.id) {
                 continue;
               }
 
@@ -282,12 +296,23 @@ namespace g2o {
               le.trueMeas = trueObservation4d;
               le.simulatorMeas = observation4d;
               le.information = information;
+
+              if(edge_counter.find(edge_key) == edge_counter.end()){
+                edge_counter[edge_key] = 1;
+              } else {
+                edge_counter[edge_key] += 1;
+              }
             }
 
           }
         }
         cerr << "done." << endl;
       }
+
+      // std::map<std::pair<int, int>, int>::iterator it;
+      // for(it = edge_counter.begin(); it != edge_counter.end(); it++){
+      //   std::cout << it->first.first << " " << it->first.second << ": " << it->second << "\n";
+      // }
 
       // cleaning up
       for (LandmarkGrid::iterator it = grid.begin(); it != grid.end(); ++it) {
@@ -314,12 +339,12 @@ namespace g2o {
     {
       switch (motionDirection) {
         case MO_LEFT:
-          return SE3(stepLen, 0, stepLen, 0.0, 0.0, 0.2);
+          return SE3(stepLen, 0, stepLen, 2.0, 0.0, 0.2);
         case MO_RIGHT:
-          return SE3(0, stepLen, stepLen, 0.0, 0.2, 0.0);
+          return SE3(0, stepLen, stepLen, 0.0, 0.2, 2.0);
         default:
           cerr << "Unknown motion direction" << endl;
-          return SE3(stepLen, stepLen, 0, 0.2, 0.0, 0.0);
+          return SE3(stepLen, stepLen, 0, 0.2, 2.0, 0.0);
       }
     }
 

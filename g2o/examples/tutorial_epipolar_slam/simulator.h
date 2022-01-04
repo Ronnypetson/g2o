@@ -92,7 +92,8 @@ namespace g2o {
           int to;
           Eigen::Vector4d trueMeas;
           Eigen::Vector4d simulatorMeas;
-          Eigen::Matrix2d information;
+          // Eigen::Matrix2d information;
+          Eigen::Matrix<double, 1, 1> information;
           EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         };
         typedef std::vector<LandmarkEdge, Eigen::aligned_allocator<LandmarkEdge> >  LandmarkEdgeVector;
